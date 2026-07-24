@@ -1,49 +1,89 @@
 # GPU Programming
 
-Hands-on CUDA lessons on Windows, from first kernel launch through memory and compute patterns.
+Hands-on path from CUDA kernels → profiling → Triton / HIP / TensorRT / attention & serving stacks.
 
-This README is the living index — each new lesson gets a short entry here.
+This README is the living index. Add a row (and a short section) when you open a new folder.
 
-## Setup
+## Layout
+
+```
+gpu-programming/
+├── README.md
+├── cuda/                 # CUDA C++ lessons (nvcc)
+│   ├── 01_hello_cuda/
+│   ├── 02_vector_addition/
+│   ├── 03_matrix_addition/   # planned
+│   ├── 04_shared_memory/     # planned
+│   ├── 05_reduction/         # planned
+│   └── ...
+├── profiling/            # Nsight, roofline, perf notes
+│   ├── nsight_systems/
+│   ├── nsight_compute/
+│   └── roofline/
+├── triton/               # Triton kernels
+├── hip/                  # AMD / HIP ports
+├── tensorrt/             # inference engine
+├── flashattention/       # attention kernels / papers practice
+├── vllm/                 # LLM serving
+├── notes/                # theory, cheat sheets
+└── scripts/              # Windows build + env helpers
+```
+
+## Setup (CUDA track)
 
 **Required**
 
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) (`nvcc` on `PATH`)
 - Visual Studio 2022 **Build Tools** with MSVC (`cl.exe`)
-- Windows 10/11 SDK (needed for linking, e.g. `uuid.lib`)
+- Windows 10/11 SDK (linking, e.g. `uuid.lib`)
 
-**Optional Python helpers** (plots / checks)
+**Optional Python helpers**
 
 ```powershell
 pip install -r requirements.txt
 python scripts\verify_env.py
 ```
 
-## Build & run
-
-From a shell that has MSVC loaded (or use the helper, which loads `vcvars64` for you):
+## Build & run (CUDA)
 
 ```powershell
-# one-shot: load VS x64 tools into this terminal
+# load VS x64 tools into this terminal (once per shell)
 cmd /k '"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"'
 
-nvcc lessons\01_hello_cuda\hello_cuda.cu -o hello_cuda
+nvcc cuda\01_hello_cuda\hello_cuda.cu -o hello_cuda
 .\hello_cuda.exe
 ```
 
 Or:
 
 ```powershell
-.\scripts\build_cu.ps1 lessons\01_hello_cuda\hello_cuda.cu -Run
-.\scripts\build_cu.ps1 lessons\02_vector_addition\vector_addition.cu -Run
+.\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu -Run
+.\scripts\build_cu.ps1 cuda\02_vector_addition\vector_addition.cu -Run
 ```
 
-## Lessons
+## Progress
 
-| # | Folder | Idea |
-|---|--------|------|
-| 01 | [`lessons/01_hello_cuda`](lessons/01_hello_cuda) | Launch a kernel; print from GPU threads |
-| 02 | [`lessons/02_vector_addition`](lessons/02_vector_addition) | Host ↔ device memory; simple elementwise add |
+### CUDA
+
+| # | Folder | Status | Idea |
+|---|--------|--------|------|
+| 01 | [`cuda/01_hello_cuda`](cuda/01_hello_cuda) | done | Launch a kernel; print from GPU threads |
+| 02 | [`cuda/02_vector_addition`](cuda/02_vector_addition) | done | Host ↔ device memory; elementwise add |
+| 03 | [`cuda/03_matrix_addition`](cuda/03_matrix_addition) | planned | 2D indexing / grids |
+| 04 | [`cuda/04_shared_memory`](cuda/04_shared_memory) | planned | Tiling with `__shared__` |
+| 05 | [`cuda/05_reduction`](cuda/05_reduction) | planned | Parallel reduce patterns |
+
+### Other tracks
+
+| Area | Folder | Status |
+|------|--------|--------|
+| Profiling | [`profiling/`](profiling/) | planned |
+| Triton | [`triton/`](triton/) | planned |
+| HIP | [`hip/`](hip/) | planned |
+| TensorRT | [`tensorrt/`](tensorrt/) | planned |
+| FlashAttention | [`flashattention/`](flashattention/) | planned |
+| vLLM | [`vllm/`](vllm/) | planned |
+| Notes | [`notes/`](notes/) | planned |
 
 ### 01 — Hello CUDA
 
@@ -53,15 +93,8 @@ Minimal `__global__` kernel. Grid `<<<2, 5>>>` → 2 blocks × 5 threads; each t
 
 CPU loop (commented) vs GPU kernel: `cudaMalloc` / `cudaMemcpy` H2D → `addVectors<<<1, N>>>` → D2H → `cudaFree`. Indexing with `blockIdx.x * blockDim.x + threadIdx.x`.
 
-## Layout
-
-```
-lessons/          # numbered CUDA exercises (.cu)
-scripts/          # build helper + env smoke test
-requirements.txt  # optional numpy/matplotlib
-```
-
 ## Notes
 
-- Prefer `.cu` + `nvcc` on Windows; `gcc` is not required for these lessons.
+- Prefer `.cu` + `nvcc` on Windows for the `cuda/` track; `gcc` is not required.
 - Build artifacts (`*.exe`, `*.obj`, `*.lib`, `*.exp`, …) are gitignored.
+- Empty planned folders use `.gitkeep` so the tree stays visible until real code lands.

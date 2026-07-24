@@ -1,7 +1,7 @@
 # Compile and run a CUDA .cu file with nvcc (Windows-friendly).
 # Usage:
-#   .\scripts\build_cu.ps1 lessons\01_hello_cuda\hello.cu
-#   .\scripts\build_cu.ps1 lessons\01_hello_cuda\hello.cu -OutDir build -Run
+#   .\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu
+#   .\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu -OutDir build -Run
 
 param(
     [Parameter(Mandatory = $true, Position = 0)]
