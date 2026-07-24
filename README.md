@@ -12,7 +12,7 @@ gpu-programming/
 ├── cuda/                 # CUDA C++ lessons (nvcc)
 │   ├── 01_hello_cuda/
 │   ├── 02_vector_addition/
-│   ├── 03_matrix_addition/   # planned
+│   ├── 03_matrix_addition/
 │   ├── 04_shared_memory/     # planned
 │   ├── 05_reduction/         # planned
 │   └── ...
@@ -59,6 +59,7 @@ Or:
 ```powershell
 .\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu -Run
 .\scripts\build_cu.ps1 cuda\02_vector_addition\vector_addition.cu -Run
+.\scripts\build_cu.ps1 cuda\03_matrix_addition\matrix_addition.cu -Run
 ```
 
 ## Progress
@@ -69,7 +70,7 @@ Or:
 |---|--------|--------|------|
 | 01 | [`cuda/01_hello_cuda`](cuda/01_hello_cuda) | done | Launch a kernel; print from GPU threads |
 | 02 | [`cuda/02_vector_addition`](cuda/02_vector_addition) | done | Host ↔ device memory; elementwise add |
-| 03 | [`cuda/03_matrix_addition`](cuda/03_matrix_addition) | planned | 2D indexing / grids |
+| 03 | [`cuda/03_matrix_addition`](cuda/03_matrix_addition) | done | 2D thread indexing; flat matrix storage |
 | 04 | [`cuda/04_shared_memory`](cuda/04_shared_memory) | planned | Tiling with `__shared__` |
 | 05 | [`cuda/05_reduction`](cuda/05_reduction) | planned | Parallel reduce patterns |
 
@@ -92,6 +93,10 @@ Minimal `__global__` kernel. Grid `<<<2, 5>>>` → 2 blocks × 5 threads; each t
 ### 02 — Vector addition
 
 CPU loop (commented) vs GPU kernel: `cudaMalloc` / `cudaMemcpy` H2D → `addVectors<<<1, N>>>` → D2H → `cudaFree`. Indexing with `blockIdx.x * blockDim.x + threadIdx.x`.
+
+### 03 — Matrix addition
+
+2×3 matrices as flat device arrays (`row * cols + col`). Kernel uses 2D indices: `row` / `col` from `blockIdx` + `threadIdx`. Launch with `dim3 threads(ROWS, COLS)` and one block: `matrixAddition<<<1, threads>>>`.
 
 ## Notes
 
