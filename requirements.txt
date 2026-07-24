@@ -1,0 +1,4 @@
+# Light Python helpers for checking results / plots.
+# CUDA C++ itself uses the globally installed Toolkit (nvcc on PATH).
+numpy>=1.26
+matplotlib>=3.8
