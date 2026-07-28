@@ -13,8 +13,9 @@ gpu-programming/
 │   ├── 01_hello_cuda/
 │   ├── 02_vector_addition/
 │   ├── 03_matrix_addition/
-│   ├── 04_shared_memory/     # planned
+│   ├── 04_matrix_multiply/
 │   ├── 05_reduction/         # planned
+│   ├── 06_shared_memory/     # planned
 │   └── ...
 ├── profiling/            # Nsight, roofline, perf notes
 │   ├── nsight_systems/
@@ -60,6 +61,7 @@ Or:
 .\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu -Run
 .\scripts\build_cu.ps1 cuda\02_vector_addition\vector_addition.cu -Run
 .\scripts\build_cu.ps1 cuda\03_matrix_addition\matrix_addition.cu -Run
+.\scripts\build_cu.ps1 cuda\04_matrix_multiply\matmul.cu -Run
 ```
 
 ## Progress
@@ -71,8 +73,9 @@ Or:
 | 01 | [`cuda/01_hello_cuda`](cuda/01_hello_cuda) | done | Launch a kernel; print from GPU threads |
 | 02 | [`cuda/02_vector_addition`](cuda/02_vector_addition) | done | Host ↔ device memory; elementwise add |
 | 03 | [`cuda/03_matrix_addition`](cuda/03_matrix_addition) | done | 2D thread indexing; flat matrix storage |
-| 04 | [`cuda/04_shared_memory`](cuda/04_shared_memory) | planned | Tiling with `__shared__` |
+| 04 | [`cuda/04_matrix_multiply`](cuda/04_matrix_multiply) | done | Naive GEMM; one thread per output; 2D grid |
 | 05 | [`cuda/05_reduction`](cuda/05_reduction) | planned | Parallel reduce patterns |
+| 06 | [`cuda/06_shared_memory`](cuda/06_shared_memory) | planned | Tiling with `__shared__` |
 
 ### Other tracks
 
@@ -97,6 +100,10 @@ CPU loop (commented) vs GPU kernel: `cudaMalloc` / `cudaMemcpy` H2D → `addVect
 ### 03 — Matrix addition
 
 2×3 matrices as flat device arrays (`row * cols + col`). Kernel uses 2D indices: `row` / `col` from `blockIdx` + `threadIdx`. Launch with `dim3 threads(ROWS, COLS)` and one block: `matrixAddition<<<1, threads>>>`.
+
+### 04 — Matrix multiply
+
+Naive `C(M×N) = A(M×K) × B(K×N)`. Host keeps 2D arrays; device uses flat row-major (`A[row*K+k]`, `B[k*N+col]`, `C[row*N+col]`). Each thread owns one `C[row][col]` and loops over `K`. Launch with `dim3 block(16,16)` and a ceiling-divided 2D grid over the output.
 
 ## Notes
 
