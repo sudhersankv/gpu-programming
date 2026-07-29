@@ -25,7 +25,8 @@ gpu-programming/
 ├── hip/                  # AMD / HIP ports
 ├── tensorrt/             # inference engine
 ├── flashattention/       # attention kernels / papers practice
-├── vllm/                 # LLM serving
+├── vllm/                 # LLM serving (planned)
+├── llm-inference-runtime-lab/  # HF / vLLM serving benchmarks
 ├── notes/                # theory, cheat sheets
 └── scripts/              # Windows build + env helpers
 ```
@@ -87,6 +88,7 @@ Or:
 | TensorRT | [`tensorrt/`](tensorrt/) | planned |
 | FlashAttention | [`flashattention/`](flashattention/) | planned |
 | vLLM | [`vllm/`](vllm/) | planned |
+| Inference lab | [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/) | Phase 3 (bench harness) |
 | Notes | [`notes/`](notes/) | planned |
 
 ### 01 — Hello CUDA

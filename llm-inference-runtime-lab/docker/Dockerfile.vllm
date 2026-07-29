@@ -1,0 +1,27 @@
+# Phase 2: vLLM OpenAI-compatible server for the inference lab.
+# Extends the official image instead of compiling vLLM from scratch.
+
+FROM vllm/vllm-openai:v0.11.0
+
+# Optional lab extras inside the container (client can also stay on the host).
+# Official image uses its own Python env; install system-wide as docs show.
+RUN pip install --no-cache-dir \
+    httpx \
+    pandas \
+    matplotlib
+
+# Default model for this lab (override at runtime if needed).
+ENV HF_HOME=/root/.cache/huggingface \
+    MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct
+
+# Official image already sets an entrypoint that runs the OpenAI API server.
+# Extra args after the image name are passed to vLLM, e.g. --model ...
+# We do not replace ENTRYPOINT.
+
+EXPOSE 8000
+
+# Sensible defaults for an 8 GB laptop GPU; override in `docker run`.
+# Note: CMD args are appended to the image entrypoint.
+CMD ["--model", "Qwen/Qwen2.5-1.5B-Instruct", \
+     "--max-model-len", "4096", \
+     "--gpu-memory-utilization", "0.85"]

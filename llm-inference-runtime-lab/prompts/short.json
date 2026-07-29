@@ -1,0 +1,52 @@
+[
+  {
+    "prompt_id": "kv_cache_short",
+    "text": "Explain KV Cache in one short paragraph.",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "prefill_vs_decode",
+    "text": "In LLM inference, what is the difference between the prefill phase and the decode phase?",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "paged_attention",
+    "text": "What problem does PagedAttention solve in LLM serving systems?",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "ttft_meaning",
+    "text": "Define time to first token (TTFT) and say what usually dominates it.",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "continuous_batching",
+    "text": "Explain continuous batching for LLM servers in two sentences.",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "prefix_caching",
+    "text": "When does shared-prefix KV-cache reuse help, and when does it not help?",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "gpu_memory_kv",
+    "text": "Why does KV-cache memory grow with sequence length and batch size?",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "throughput_vs_latency",
+    "text": "Describe the throughput versus latency tradeoff in LLM serving.",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "chunked_prefill",
+    "text": "What is chunked prefill, and why might a scheduler use it?",
+    "max_new_tokens": 64
+  },
+  {
+    "prompt_id": "recompute_vs_transfer",
+    "text": "When might recomputing a prompt prefill be faster than loading cached KV from CPU memory?",
+    "max_new_tokens": 64
+  }
+]
