@@ -45,6 +45,71 @@ This project is being built incrementally. Each phase introduces a new inference
 * `summarize.py` — mean / p50 / p90 / p95 / p99 (skips warmup)
 * `plot_compare.py` — HF vs vLLM bar charts
 
+### Phase 3 Results (laptop, RTX 4060)
+
+**Config**
+
+* Model: `Qwen/Qwen2.5-1.5B-Instruct`
+* Prompts: `prompts/short.json` (10 questions)
+* `max_new_tokens=64`, temperature 0
+* Warmup: 1 per prompt (excluded from stats)
+* Measured trials: 5 per prompt → **50 measured requests per engine**
+* Hardware: NVIDIA RTX 4060 Laptop (~8 GB), Windows host + vLLM in Docker
+
+**Artifacts**
+
+| File | Description |
+|------|-------------|
+| `results/bench_vllm_20260728_191524.jsonl` | Raw vLLM trials |
+| `results/bench_hf_20260728_191640.jsonl` | Raw HF trials |
+| `results/bench_vllm_20260728_191524.summary.json` | Percentile summary |
+| `results/bench_hf_20260728_191640.summary.json` | Percentile summary |
+| `results/compare_hf_vllm.png` | Side-by-side mean bars (TTFT / E2E / tok/s) |
+
+#### Comparison plot
+
+![HF vs vLLM — mean TTFT, E2E, and output tok/s across 10 prompts](results/compare_hf_vllm.png)
+
+Regenerate the plot:
+
+```powershell
+python plot_compare.py `
+  results\bench_hf_20260728_191640.jsonl `
+  results\bench_vllm_20260728_191524.jsonl `
+  --out results\compare_hf_vllm.png
+```
+
+#### Aggregate (mean of per-prompt means)
+
+| Engine | TTFT (s) | E2E (s) | Output tok/s |
+|--------|----------|---------|--------------|
+| Hugging Face | 0.116 | 2.21 | 30.2 |
+| vLLM | **0.037** | **1.06** | **62.8** |
+| Speedup (HF → vLLM) | ~3.1× | ~2.1× | ~2.1× |
+
+#### One prompt detail — `kv_cache_short` (mean, n=5)
+
+| Engine | TTFT (s) | E2E (s) | Output tok/s |
+|--------|----------|---------|--------------|
+| Hugging Face | 0.094 | 2.05 | 29.6 |
+| vLLM | 0.036 | 1.01 | 65.9 |
+
+#### Sample percentile lines (vLLM `ttft_meaning`, n=5)
+
+```text
+ttft_s             mean=0.0375  p50=0.0378  p90=0.0396  p95=0.0399  p99=0.0402
+e2e_s              mean=0.9721  p50=0.9725  p90=0.9743  p95=0.9747  p99=0.9750
+output_tok_per_s   mean=68.48   p50=68.53   p90=68.77   p95=68.82   p99=68.87
+```
+
+**Takeaways**
+
+* On short prompts, warm vLLM is clearly faster than naive HF `generate` on this laptop.
+* Decode throughput roughly **doubles**; TTFT drops by about **3×**.
+* Per-prompt variance is small for TTFT on vLLM (~35–40 ms means); HF TTFT spans ~88–165 ms depending on the prompt.
+* These are development-scale numbers (8 GB laptop, short contexts) — not datacenter claims.
+* First-request cold start is excluded via warmup; always compare warm measured trials.
+
 ## Phase 4 — Shared-prefix workload (Qasper)
 
 * `prepare_qasper_workload.py` builds a fixed, reproducible fixture from **allenai/qasper**
@@ -200,73 +265,6 @@ In a second terminal, run the Qasper shared bench against `localhost:8000`, then
 * Tighter captures around prefill vs decode / warm prefix hits
 * Nsight Compute for kernel-level metrics
 * PyTorch Profiler on the HF path for comparison
-
----
-
-## Phase 3 Results (laptop, RTX 4060)
-
-**Config**
-
-* Model: `Qwen/Qwen2.5-1.5B-Instruct`
-* Prompts: `prompts/short.json` (10 questions)
-* `max_new_tokens=64`, temperature 0
-* Warmup: 1 per prompt (excluded from stats)
-* Measured trials: 5 per prompt → **50 measured requests per engine**
-* Hardware: NVIDIA RTX 4060 Laptop (~8 GB), Windows host + vLLM in Docker
-
-**Artifacts**
-
-| File | Description |
-|------|-------------|
-| `results/bench_vllm_20260728_191524.jsonl` | Raw vLLM trials |
-| `results/bench_hf_20260728_191640.jsonl` | Raw HF trials |
-| `results/bench_vllm_20260728_191524.summary.json` | Percentile summary |
-| `results/bench_hf_20260728_191640.summary.json` | Percentile summary |
-| `results/compare_hf_vllm.png` | Side-by-side mean bars (TTFT / E2E / tok/s) |
-
-### Comparison plot
-
-![HF vs vLLM — mean TTFT, E2E, and output tok/s across 10 prompts](results/compare_hf_vllm.png)
-
-Regenerate the plot:
-
-```powershell
-python plot_compare.py `
-  results\bench_hf_20260728_191640.jsonl `
-  results\bench_vllm_20260728_191524.jsonl `
-  --out results\compare_hf_vllm.png
-```
-
-### Aggregate (mean of per-prompt means)
-
-| Engine | TTFT (s) | E2E (s) | Output tok/s |
-|--------|----------|---------|--------------|
-| Hugging Face | 0.116 | 2.21 | 30.2 |
-| vLLM | **0.037** | **1.06** | **62.8** |
-| Speedup (HF → vLLM) | ~3.1× | ~2.1× | ~2.1× |
-
-### One prompt detail — `kv_cache_short` (mean, n=5)
-
-| Engine | TTFT (s) | E2E (s) | Output tok/s |
-|--------|----------|---------|--------------|
-| Hugging Face | 0.094 | 2.05 | 29.6 |
-| vLLM | 0.036 | 1.01 | 65.9 |
-
-### Sample percentile lines (vLLM `ttft_meaning`, n=5)
-
-```text
-ttft_s             mean=0.0375  p50=0.0378  p90=0.0396  p95=0.0399  p99=0.0402
-e2e_s              mean=0.9721  p50=0.9725  p90=0.9743  p95=0.9747  p99=0.9750
-output_tok_per_s   mean=68.48   p50=68.53   p90=68.77   p95=68.82   p99=68.87
-```
-
-**Takeaways**
-
-* On short prompts, warm vLLM is clearly faster than naive HF `generate` on this laptop.
-* Decode throughput roughly **doubles**; TTFT drops by about **3×**.
-* Per-prompt variance is small for TTFT on vLLM (~35–40 ms means); HF TTFT spans ~88–165 ms depending on the prompt.
-* These are development-scale numbers (8 GB laptop, short contexts) — not datacenter claims.
-* First-request cold start is excluded via warmup; always compare warm measured trials.
 
 ---
 
