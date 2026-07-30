@@ -82,13 +82,13 @@ Or:
 
 | Area | Folder | Status |
 |------|--------|--------|
-| Profiling | [`profiling/`](profiling/) | next (learning tools) |
+| Profiling | [`profiling/`](profiling/) | Nsight learning (see inference lab Phase 6) |
 | Triton | [`triton/`](triton/) | planned |
 | HIP | [`hip/`](hip/) | planned |
 | TensorRT | [`tensorrt/`](tensorrt/) | planned |
 | FlashAttention | [`flashattention/`](flashattention/) | planned |
 | vLLM | [`vllm/`](vllm/) | planned |
-| Inference lab | [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/) | Phases 1–5 done; next = profiling |
+| Inference lab | [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/) | Phases 1–6 (Nsight timeline literacy) |
 | Notes | [`notes/`](notes/) | planned |
 
 ### 01 — Hello CUDA

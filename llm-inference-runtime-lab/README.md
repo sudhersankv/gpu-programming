@@ -15,11 +15,12 @@ This project is being built incrementally. Each phase introduces a new inference
 * [x] **Phase 3** — Benchmark framework
 * [x] **Phase 4** — Shared-prefix workload generation (Qasper)
 * [x] **Phase 5** — vLLM automatic prefix caching (shared vs control)
-* [ ] **Phase 6** — Profiling (Nsight / PyTorch Profiler) ← *next (learning first)*
+* [x] **Phase 6** — Profiling literacy (Nsight Systems) — *learning first*
 * [ ] Phase 7 — LMCache integration
 * [ ] Phase 8 — SGLang comparison
 * [ ] Phase 9 — TensorRT-LLM comparison
 * [ ] Phase 10 — AMD ROCm experiments
+* [ ] Phase 11 — Deeper profiling (Nsight Compute / PyTorch Profiler)
 
 ---
 
@@ -104,6 +105,104 @@ python plot_qasper_prefix.py `
 
 ---
 
+## Phase 6 — Nsight Systems profiling (learning first)
+
+**Goal:** move past TTFT / tok/s numbers and see what the inference runtime is actually doing on CPU and GPU.
+
+Built `llm-lab-vllm:profile` (`docker/Dockerfile.profile`) — same vLLM server image plus **Nsight Systems CLI** from NVIDIA’s **devtools** apt repo (not the CUDA toolkit repo). Captured a first timeline of the Qasper shared-prefix server as `profiling/reports/qasper_shared_cache_on.nsys-rep` (large binary; gitignored). Screenshots below are checked in under `profiling/screenshots/`.
+
+### Mental model
+
+```text
+Python (vLLM)
+      ↓
+CUDA Runtime API  (CPU issues work)
+      ↓
+GPU hardware      (memcpy / graphs / kernels execute)
+```
+
+Read the Nsight timeline **horizontally** (time). A vertical slice is “everything happening at one instant.” Typical correlation:
+
+```text
+VLLM::EngineCore thread
+      ↓
+CUDA Runtime API  (cudaMemcpyAsync, launches, sync)
+      ↓
+GPU Memory Copy / CUDA Graphs / Kernels
+```
+
+### What showed up in the first capture
+
+| Row | Meaning |
+|-----|---------|
+| **CPU / EngineCore** | Host scheduler + KV-cache manager; long `sem_wait` when idle between request bursts |
+| **CUDA Runtime API** | CPU-side commands — *not* GPU compute (`cudaMemcpyAsync`, graph/kernel launches) |
+| **CUDA HW** | Actual device work: memory ≈ 60%, kernels ≈ 25%, graphs ≈ 15% in this capture |
+| **Default stream 7** | Most GPU work (~95%) on one stream |
+| **Memcpy HtoD** | Host RAM → GPU HBM (inputs / runtime metadata) |
+| **Kernels** | Many small kernels per transformer step (e.g. `vectorized_elementwise_*`, Triton fused ops like `triton_poi_fused_mul_silu_*`) |
+
+Key distinctions learned:
+
+* CUDA API launch ≠ GPU kernel execution
+* One transformer layer → many GPU kernels (often Triton-generated in vLLM)
+* Idle gaps (`sem_wait` / `poll`) are the server waiting for work, not “broken GPU”
+
+### Screenshots
+
+Full session overview (request bursts vs idle):
+
+![Nsight Systems — full timeline overview](profiling/screenshots/nsight_overview_1.png)
+
+EngineCore + CUDA HW correlation across the run:
+
+![Nsight Systems — EngineCore and GPU activity](profiling/screenshots/nsight_overview_2.png)
+
+Main expanded view (streams, EngineCore, CUDA API):
+
+![Nsight Systems — main expanded timeline](profiling/screenshots/nsight_main.png)
+
+Zoomed into a memory-heavy window (`cudaMemcpyAsync` ↔ Memcpy HtoD on stream 7):
+
+![Nsight Systems — zoomed memcpy / CUDA API](profiling/screenshots/nsight_zoomed.png)
+
+### How to capture (this machine)
+
+```powershell
+# build once
+cd docker
+docker build -f Dockerfile.profile -t llm-lab-vllm:profile .
+
+# from lab root — note: override ENTRYPOINT; use /usr/bin/python3
+New-Item -ItemType Directory -Force -Path profiling\reports | Out-Null
+
+docker run --rm -it `
+  --gpus all --ipc=host --cap-add=SYS_ADMIN -p 8000:8000 `
+  -v ${env:USERPROFILE}\.cache\huggingface:/root/.cache/huggingface `
+  -v ${PWD}\profiling\reports:/reports `
+  --entrypoint nsys `
+  llm-lab-vllm:profile `
+  profile `
+  --trace=cuda,nvtx,osrt `
+  --sample=process-tree `
+  --output=/reports/qasper_shared_cache_on `
+  --force-overwrite=true `
+  /usr/bin/python3 -m vllm.entrypoints.openai.api_server `
+  --model Qwen/Qwen2.5-1.5B-Instruct `
+  --max-model-len 4096 `
+  --gpu-memory-utilization 0.85
+```
+
+In a second terminal, run the Qasper shared bench against `localhost:8000`, then stop the container so `nsys` flushes the `.nsys-rep`. Open the report in the **Nsight Systems** GUI on Windows.
+
+### Still ahead in profiling
+
+* Tighter captures around prefill vs decode / warm prefix hits
+* Nsight Compute for kernel-level metrics
+* PyTorch Profiler on the HF path for comparison
+
+---
+
 ## Phase 3 Results (laptop, RTX 4060)
 
 **Config**
@@ -171,19 +270,14 @@ output_tok_per_s   mean=68.48   p50=68.53   p90=68.77   p95=68.82   p99=68.87
 
 ---
 
-# Next up — Profiling (learning first)
-
-Before wiring Nsight / PyTorch Profiler into this lab, the next step is **learning the profiling tools** (timeline vs kernel metrics, how to read prefill vs decode, where TTFT shows up). Phase 6 will then profile the same HF / vLLM / Qasper setups with a consistent methodology.
-
----
-
 # Environment
 
 * Windows 11 + Docker Desktop (WSL2 / Linux engine)
 * Python 3.12 (host venv for clients)
 * NVIDIA RTX 4060 Laptop GPU (~8 GB)
 * CUDA-enabled PyTorch + Hugging Face Transformers
-* vLLM in Docker (`llm-lab-vllm:phase2`)
+* vLLM in Docker (`llm-lab-vllm:phase2`, profiling image `llm-lab-vllm:profile`)
+* Nsight Systems CLI inside the profile image; GUI on the Windows host
 
 ---
 
@@ -278,7 +372,7 @@ python plot_qasper_prefix.py
 
 # Future Work
 
-* Profiling methodology (Nsight Systems / Compute, PyTorch Profiler)
+* Deeper profiling (Nsight Compute, PyTorch Profiler; prefill vs decode slices)
 * Prompt-length sweeps (512 / 2048 token fixtures)
 * Concurrency sweeps
 * LMCache

@@ -37,3 +37,7 @@ llm-inference-runtime-lab/results/*
 !llm-inference-runtime-lab/results/.gitkeep
 !llm-inference-runtime-lab/results/*.summary.json
 !llm-inference-runtime-lab/results/*.png
+# Large Nsight binary traces (keep screenshots under profiling/screenshots/)
+llm-inference-runtime-lab/profiling/reports/*.nsys-rep
+llm-inference-runtime-lab/profiling/reports/*.qdrep
+llm-inference-runtime-lab/profiling/reports/*.sqlite
