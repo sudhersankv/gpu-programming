@@ -13,10 +13,10 @@ This project is being built incrementally. Each phase introduces a new inference
 * [x] **Phase 1** — Hugging Face baseline
 * [x] **Phase 2** — vLLM baseline (Docker)
 * [x] **Phase 3** — Benchmark framework
-* [ ] Phase 4 — Shared-prefix workload generation
-* [ ] Phase 5 — vLLM Prefix Caching
-* [ ] Phase 6 — LMCache integration
-* [ ] Phase 7 — Profiling (Nsight / PyTorch Profiler)
+* [x] **Phase 4** — Shared-prefix workload generation (Qasper)
+* [x] **Phase 5** — vLLM automatic prefix caching (shared vs control)
+* [ ] **Phase 6** — Profiling (Nsight / PyTorch Profiler) ← *next (learning first)*
+* [ ] Phase 7 — LMCache integration
 * [ ] Phase 8 — SGLang comparison
 * [ ] Phase 9 — TensorRT-LLM comparison
 * [ ] Phase 10 — AMD ROCm experiments
@@ -43,6 +43,64 @@ This project is being built incrementally. Each phase introduces a new inference
 * `run_benchmark.py` — choose engine, warmup, N trials, one JSONL
 * `summarize.py` — mean / p50 / p90 / p95 / p99 (skips warmup)
 * `plot_compare.py` — HF vs vLLM bar charts
+
+## Phase 4 — Shared-prefix workload (Qasper)
+
+* `prepare_qasper_workload.py` builds a fixed, reproducible fixture from **allenai/qasper**
+* Tokenizer: `Qwen/Qwen2.5-1.5B-Instruct`
+* Paper truncated to **1024** tokens; `NUM_PROMPTS = 10`; `max_new_tokens = 64`
+* Prompt template: paper context → question → `Answer:`
+
+| File | Role |
+|------|------|
+| `prompts/qasper_shared_1024.json` | Same 1024-token paper + 10 different questions (reusable prefix) |
+| `prompts/qasper_control_1024.json` | 10 different papers × 1 question each (no shared prefix) |
+
+Regenerate:
+
+```powershell
+python prepare_qasper_workload.py
+```
+
+## Phase 5 — vLLM prefix caching
+
+* Same harness (`run_benchmark.py`) against vLLM with automatic prefix caching enabled
+* Compared **shared** vs **control** Qasper fixtures (one measured trial per prompt in the recorded run)
+* `plot_qasper_prefix.py` — per-request TTFT/E2E bars, trajectory, and first-vs-rest summary
+
+**Artifacts**
+
+| File | Description |
+|------|-------------|
+| `results/qasper_shared_cache_on.jsonl` | Shared-prefix run (local; gitignored raw JSONL) |
+| `results/qasper_control_cache_on.jsonl` | Control run (local; gitignored raw JSONL) |
+| `results/qasper_prefix_compare.png` | Shared vs control TTFT / E2E plot |
+
+### Prefix-cache plot
+
+![Qasper shared vs control with vLLM prefix cache on](results/qasper_prefix_compare.png)
+
+```powershell
+python plot_qasper_prefix.py `
+  --shared results\qasper_shared_cache_on.jsonl `
+  --control results\qasper_control_cache_on.jsonl `
+  --out results\qasper_prefix_compare.png
+```
+
+### Headline numbers (this machine, cache on)
+
+| Slice | TTFT (s) |
+|-------|----------|
+| Shared — first request (cold prefix) | **2.335** |
+| Shared — mean of requests 1–9 (warm prefix) | **0.039** |
+| Control — mean across 10 requests | **0.172** |
+
+**Takeaways**
+
+* After the first shared request fills the prefix KV cache, later shared questions hit ~**0.04 s** TTFT.
+* Control stays ~**0.15–0.25 s** TTFT — every prompt has a unique long paper prefix.
+* Warm shared TTFT is roughly **4×** lower than control mean, and ~**60×** lower than the shared cold first request.
+* E2E still includes decode; TTFT is the clearest prefix-cache signal on this fixture.
 
 ---
 
@@ -110,6 +168,12 @@ output_tok_per_s   mean=68.48   p50=68.53   p90=68.77   p95=68.82   p99=68.87
 * Per-prompt variance is small for TTFT on vLLM (~35–40 ms means); HF TTFT spans ~88–165 ms depending on the prompt.
 * These are development-scale numbers (8 GB laptop, short contexts) — not datacenter claims.
 * First-request cold start is excluded via warmup; always compare warm measured trials.
+
+---
+
+# Next up — Profiling (learning first)
+
+Before wiring Nsight / PyTorch Profiler into this lab, the next step is **learning the profiling tools** (timeline vs kernel metrics, how to read prefill vs decode, where TTFT shows up). Phase 6 will then profile the same HF / vLLM / Qasper setups with a consistent methodology.
 
 ---
 
@@ -183,9 +247,24 @@ python plot_compare.py results\bench_hf_20260728_191640.jsonl results\bench_vllm
 
 Defaults: `--warmup 1`, `--trials 5`, `--max-new-tokens 64`.
 
+## Qasper prefix-cache bench (Phases 4–5)
+
+```powershell
+python prepare_qasper_workload.py
+
+python run_benchmark.py --engine vllm --warmup 0 --trials 1 `
+  --prompts prompts/qasper_shared_1024.json
+
+python run_benchmark.py --engine vllm --warmup 0 --trials 1 `
+  --prompts prompts/qasper_control_1024.json
+
+# rename/copy JSONLs to the names plot_qasper_prefix.py expects, then:
+python plot_qasper_prefix.py
+```
+
 ---
 
-# Prompt set
+# Prompt sets
 
 `prompts/short.json` — 10 inference-systems questions (similar length, fixed `max_new_tokens=64`):
 
@@ -193,16 +272,16 @@ Defaults: `--warmup 1`, `--trials 5`, `--max-new-tokens 64`.
 * continuous_batching, prefix_caching, gpu_memory_kv
 * throughput_vs_latency, chunked_prefill, recompute_vs_transfer
 
+`prompts/qasper_*_1024.json` — long-context shared-prefix vs control fixtures (Phase 4).
+
 ---
 
 # Future Work
 
-* Prompt-length sweeps (exact token counts)
+* Profiling methodology (Nsight Systems / Compute, PyTorch Profiler)
+* Prompt-length sweeps (512 / 2048 token fixtures)
 * Concurrency sweeps
-* Shared-prefix workloads
-* vLLM automatic prefix caching
 * LMCache
-* Nsight / PyTorch profiling
 * SGLang / TensorRT-LLM / ROCm
 
 Each phase will introduce one new systems concept while keeping the benchmark methodology consistent.

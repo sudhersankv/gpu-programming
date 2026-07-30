@@ -31,7 +31,8 @@ Thumbs.db
 out/
 build/
 
-# LLM lab raw results (keep summaries + plots for the README)
+# LLM lab caches / raw results (keep summaries + plots for the README)
+llm-inference-runtime-lab/.cache/
 llm-inference-runtime-lab/results/*
 !llm-inference-runtime-lab/results/.gitkeep
 !llm-inference-runtime-lab/results/*.summary.json
