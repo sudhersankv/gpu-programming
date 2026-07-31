@@ -88,7 +88,7 @@ Or:
 | TensorRT | [`tensorrt/`](tensorrt/) | planned |
 | FlashAttention | [`flashattention/`](flashattention/) | planned |
 | vLLM | [`vllm/`](vllm/) | planned |
-| Inference lab | [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/) | Phases 1–6 (Nsight timeline literacy) |
+| Inference lab | [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/) | Phases 1–6 done (APC = metadata, KV stays on GPU) |
 | Notes | [`notes/`](notes/) | planned |
 
 ### 01 — Hello CUDA
