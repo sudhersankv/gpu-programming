@@ -26,10 +26,14 @@ gpu-programming/
 ├── tensorrt/             # inference engine
 ├── flashattention/       # attention kernels / papers practice
 ├── vllm/                 # LLM serving (planned)
-├── llm-inference-runtime-lab/  # HF / vLLM serving benchmarks
+├── llm-inference-runtime-lab/  # HF / vLLM serving benchmarks + Nsight
+├── docs/                 # GitHub Pages (APC Nsight A/B dashboard)
 ├── notes/                # theory, cheat sheets
 └── scripts/              # Windows build + env helpers
 ```
+
+**Live dashboard:** [APC · Nsight cache ON vs OFF](https://sudhersankv.github.io/gpu-programming/)  
+(Enable Pages: Settings → Pages → Deploy from branch → `/docs`.)
 
 ## Setup (CUDA track)
 

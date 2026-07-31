@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>APC · Nsight A/B — LLM Inference Runtime Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --ink: #13212b;
+      --muted: #5a6b76;
+      --paper: #f3f1ea;
+      --panel: rgba(255, 255, 255, 0.72);
+      --line: rgba(19, 33, 43, 0.1);
+      --off: #c45c26;
+      --off-soft: rgba(196, 92, 38, 0.14);
+      --on: #0f6e6a;
+      --on-soft: rgba(15, 110, 106, 0.14);
+      --accent: #1f4e79;
+      --shadow: 0 18px 50px rgba(19, 33, 43, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Sora", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(15, 110, 106, 0.12), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(196, 92, 38, 0.10), transparent 50%),
+        linear-gradient(180deg, #e7edf2 0%, var(--paper) 42%, #ebe6dc 100%);
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.35;
+      background-image:
+        linear-gradient(rgba(19, 33, 43, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(19, 33, 43, 0.035) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+    }
+
+    .wrap {
+      position: relative;
+      width: min(1120px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 2.5rem 0 4rem;
+    }
+
+    header {
+      display: grid;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      animation: rise 0.7s ease both;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .eyebrow span {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--on);
+      box-shadow: 0 0 0 4px var(--on-soft);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 2.75rem);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      max-width: 16ch;
+    }
+
+    .lede {
+      margin: 0;
+      max-width: 52ch;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.55;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .chip {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      padding: 0.45rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .legend {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 0.25rem;
+    }
+
+    .legend i {
+      display: inline-block;
+      width: 0.7rem;
+      height: 0.7rem;
+      border-radius: 3px;
+      margin-right: 0.35rem;
+      vertical-align: -1px;
+    }
+
+    .legend .off i { background: var(--off); }
+    .legend .on i { background: var(--on); }
+
+    .caveat {
+      margin-top: 0.5rem;
+      padding: 1rem 1.1rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: rgba(31, 78, 121, 0.06);
+      color: var(--ink);
+      font-size: 0.92rem;
+      line-height: 1.5;
+      animation: rise 0.8s ease 0.08s both;
+    }
+
+    .caveat strong { color: var(--accent); }
+
+    .grid {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    @media (max-width: 860px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.15rem 1.2rem 1.25rem;
+      animation: rise 0.75s ease both;
+    }
+
+    .card:nth-child(2) { animation-delay: 0.05s; }
+    .card:nth-child(3) { animation-delay: 0.1s; }
+    .card:nth-child(4) { animation-delay: 0.15s; }
+
+    .card h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+
+    .card p.sub {
+      margin: 0 0 1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    @media (max-width: 860px) {
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    .kpi {
+      padding: 0.9rem 1rem;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.55);
+    }
+
+    .kpi .label {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .kpi .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+      margin-top: 0.55rem;
+    }
+
+    .kpi .val {
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .kpi .tag {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+
+    .val.off { color: var(--off); }
+    .val.on { color: var(--on); }
+
+    .chart-box {
+      position: relative;
+      height: 280px;
+    }
+
+    .chart-box.tall { height: 340px; }
+
+    figure {
+      margin: 0;
+    }
+
+    figure img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+
+    figcaption {
+      margin-top: 0.7rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .findings {
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .findings li {
+      list-style: none;
+      margin: 0;
+      padding: 0.75rem 0.85rem;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.5);
+      border: 1px solid var(--line);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    footer {
+      margin-top: 2rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-family: "IBM Plex Mono", monospace;
+      line-height: 1.6;
+    }
+
+    footer a { color: var(--accent); }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow"><span></span> LLM Inference Runtime Lab · Phase 6</div>
+      <h1>Prefix cache ON vs OFF</h1>
+      <p class="lede" id="lede">
+        What automatic prefix caching looks like in Nsight Systems — and why
+        whole-session totals can look identical even when Q2 gets faster.
+      </p>
+      <div class="meta-row" id="meta"></div>
+      <div class="legend">
+        <div class="off"><i></i>Cache OFF</div>
+        <div class="on"><i></i>Cache ON</div>
+      </div>
+    </header>
+
+    <div class="caveat" id="caveat"></div>
+
+    <section class="grid" style="margin-top:1.25rem">
+      <div class="card">
+        <h2>Session HtoD / DtoH (whole capture)</h2>
+        <p class="sub">From <code>cuda_gpu_mem_time_sum</code> + size. Count and median match — model load dominates.</p>
+        <div class="kpis" id="mem-kpis"></div>
+      </div>
+    </section>
+
+    <section class="grid grid-2" style="margin-top:1rem">
+      <div class="card">
+        <h2>Client TTFT (prefix hit effect)</h2>
+        <p class="sub" id="ttft-note"></p>
+        <div class="chart-box"><canvas id="ttftChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Memcpy time by operation</h2>
+        <p class="sub">Total GPU memcpy time across the full session.</p>
+        <div class="chart-box"><canvas id="memChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid grid-2" style="margin-top:1rem">
+      <div class="card">
+        <h2>Top kernels by total time</h2>
+        <p class="sub">Share of GPU kernel time (top 8). Session includes load + requests.</p>
+        <div class="chart-box tall"><canvas id="kernChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>CUDA API time</h2>
+        <p class="sub">CPU-side CUDA runtime / driver calls.</p>
+        <div class="chart-box tall"><canvas id="apiChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="grid grid-2" style="margin-top:1rem">
+      <div class="card">
+        <h2>Kernel call counts (signals)</h2>
+        <p class="sub">Selected kernels that show up in both traces.</p>
+        <div class="chart-box"><canvas id="countChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>What to conclude</h2>
+        <ul class="findings">
+          <li><strong>No bulk KV H→D restore</strong> on a hit — shared KV stays in GPU HBM.</li>
+          <li><strong>Events timeline</strong> (below): cache ON shows a burst of tiny Host→Device copies before kernels; cache OFF does not.</li>
+          <li><strong>Client TTFT</strong> drops on the second shared-prefix question when APC is on.</li>
+          <li><strong>Session CSV totals</strong> look alike because load/init swamp the Q2 delta — that is expected, not a failed A/B.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="grid grid-2" style="margin-top:1rem">
+      <div class="card">
+        <h2>Timeline — zoomed out</h2>
+        <figure>
+          <img src="assets/warm_overview.png" alt="Cache off vs on full Nsight timelines" />
+          <figcaption>Left: cache OFF. Right: cache ON. Broad shape is similar after long init.</figcaption>
+        </figure>
+      </div>
+      <div class="card">
+        <h2>Around a request — Events</h2>
+        <figure>
+          <img src="assets/warm_events.png" alt="Cache off vs on Events detail showing tiny HtoD burst" />
+          <figcaption>Left: cache OFF (kernels dominate). Right: cache ON — tiny H→D burst, then kernels. This is the APC fingerprint.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <footer>
+      Data from <code>nsys stats --format csv</code> on <code>cache_off_warm</code> / <code>cache_on_warm</code>.
+      Rebuild: <code>python scripts/export_nsys_stats.py && python scripts/build_apc_dashboard_data.py</code>
+      · <a href="https://github.com/sudhersankv/gpu-programming">github.com/sudhersankv/gpu-programming</a>
+    </footer>
+  </div>
+
+  <script>
+    const OFF = "#c45c26";
+    const ON = "#0f6e6a";
+    const MUTED = "#5a6b76";
+
+    Chart.defaults.font.family = "'Sora', sans-serif";
+    Chart.defaults.color = MUTED;
+    Chart.defaults.plugins.legend.labels.boxWidth = 12;
+    Chart.defaults.plugins.legend.labels.boxHeight = 12;
+
+    function memByOp(side, opSub) {
+      return side.mem.find(m => m.operation.includes(opSub)) || { count: 0, total_time_ms: 0, med_ns: 0, total_mb: 0 };
+    }
+
+    function fmtMs(v) {
+      if (v >= 1000) return (v / 1000).toFixed(1) + " s";
+      return Math.round(v) + " ms";
+    }
+
+    function kpi(label, offV, onV, fmt = (x) => x) {
+      return `
+        <div class="kpi">
+          <div class="label">${label}</div>
+          <div class="pair">
+            <div><div class="tag">OFF</div><div class="val off">${fmt(offV)}</div></div>
+            <div><div class="tag">ON</div><div class="val on">${fmt(onV)}</div></div>
+          </div>
+        </div>`;
+    }
+
+    async function main() {
+      const data = await fetch("data.json").then(r => r.json());
+      const { meta, client_ttft: ttft, cache_off: off, cache_on: on } = data;
+
+      document.getElementById("caveat").innerHTML =
+        `<strong>Read this first.</strong> ${meta.caveat}`;
+
+      document.getElementById("meta").innerHTML = [
+        meta.model,
+        meta.gpu,
+        meta.protocol,
+      ].map(t => `<span class="chip">${t}</span>`).join("");
+
+      document.getElementById("ttft-note").textContent =
+        `${ttft.note} (${ttft.source})`;
+
+      const hOff = memByOp(off, "Host-to-Device");
+      const hOn = memByOp(on, "Host-to-Device");
+      const dOff = memByOp(off, "Device-to-Host");
+      const dOn = memByOp(on, "Device-to-Host");
+
+      document.getElementById("mem-kpis").innerHTML = [
+        kpi("HtoD count", hOff.count, hOn.count),
+        kpi("HtoD median", hOff.med_ns, hOn.med_ns, v => v + " ns"),
+        kpi("HtoD total time", hOff.total_time_ms, hOn.total_time_ms, fmtMs),
+        kpi("HtoD total size", hOff.total_mb, hOn.total_mb, v => v.toFixed(0) + " MB"),
+      ].join("");
+
+      new Chart(document.getElementById("ttftChart"), {
+        type: "bar",
+        data: {
+          labels: ttft.series.map(s => s.label),
+          datasets: [{
+            label: "TTFT (s)",
+            data: ttft.series.map(s => s.ttft_s),
+            backgroundColor: [OFF, ON],
+            borderRadius: 8,
+            maxBarThickness: 64,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: "seconds" },
+              grid: { color: "rgba(19,33,43,0.06)" },
+            },
+            x: { grid: { display: false } },
+          },
+        },
+      });
+
+      const memLabels = off.mem.map(m => m.operation.replace("memcpy ", ""));
+      new Chart(document.getElementById("memChart"), {
+        type: "bar",
+        data: {
+          labels: memLabels,
+          datasets: [
+            { label: "OFF", data: off.mem.map(m => m.total_time_ms / 1000), backgroundColor: OFF, borderRadius: 6 },
+            { label: "ON", data: on.mem.map(m => m.total_time_ms / 1000), backgroundColor: ON, borderRadius: 6 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: "total time (s)" },
+              grid: { color: "rgba(19,33,43,0.06)" },
+            },
+            x: { grid: { display: false } },
+          },
+        },
+      });
+
+      const kernN = 8;
+      const kernLabels = off.kernels.slice(0, kernN).map(k => k.name);
+      new Chart(document.getElementById("kernChart"), {
+        type: "bar",
+        data: {
+          labels: kernLabels,
+          datasets: [
+            {
+              label: "OFF %",
+              data: off.kernels.slice(0, kernN).map(k => k.time_pct),
+              backgroundColor: OFF,
+              borderRadius: 5,
+            },
+            {
+              label: "ON %",
+              data: kernLabels.map(name => {
+                const hit = on.kernels.find(k => k.name === name);
+                return hit ? hit.time_pct : 0;
+              }),
+              backgroundColor: ON,
+              borderRadius: 5,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              beginAtZero: true,
+              title: { display: true, text: "% of kernel time" },
+              grid: { color: "rgba(19,33,43,0.06)" },
+            },
+            y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          },
+        },
+      });
+
+      const apiN = 6;
+      const apiLabels = off.api.slice(0, apiN).map(a => a.name);
+      new Chart(document.getElementById("apiChart"), {
+        type: "bar",
+        data: {
+          labels: apiLabels,
+          datasets: [
+            {
+              label: "OFF %",
+              data: off.api.slice(0, apiN).map(a => a.time_pct),
+              backgroundColor: OFF,
+              borderRadius: 5,
+            },
+            {
+              label: "ON %",
+              data: apiLabels.map(name => {
+                const hit = on.api.find(a => a.name === name);
+                return hit ? hit.time_pct : 0;
+              }),
+              backgroundColor: ON,
+              borderRadius: 5,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              beginAtZero: true,
+              title: { display: true, text: "% of CUDA API time" },
+              grid: { color: "rgba(19,33,43,0.06)" },
+            },
+            y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          },
+        },
+      });
+
+      const signals = [
+        { key: "reshape_and_cache", label: "reshape_and_cache" },
+        { key: "flash_fwd", label: "flash_fwd_splitkv" },
+      ];
+      new Chart(document.getElementById("countChart"), {
+        type: "bar",
+        data: {
+          labels: signals.map(s => s.label),
+          datasets: [
+            {
+              label: "OFF instances",
+              data: signals.map(s => (off.signals[s.key] || {}).instances || 0),
+              backgroundColor: OFF,
+              borderRadius: 8,
+            },
+            {
+              label: "ON instances",
+              data: signals.map(s => (on.signals[s.key] || {}).instances || 0),
+              backgroundColor: ON,
+              borderRadius: 8,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: "launch count" },
+              grid: { color: "rgba(19,33,43,0.06)" },
+            },
+            x: { grid: { display: false } },
+          },
+        },
+      });
+    }
+
+    main().catch(err => {
+      document.body.insertAdjacentHTML(
+        "afterbegin",
+        `<pre style="padding:1rem;color:#a11">Failed to load data.json: ${err}</pre>`
+      );
+    });
+  </script>
+</body>
+</html>

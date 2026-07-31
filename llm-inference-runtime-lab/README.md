@@ -267,9 +267,25 @@ At a glance the two timelines still look alike. The difference shows up when you
 
 ---
 
+### Dashboard (GitHub Pages)
+
+Static comparison page built from `nsys stats` CSVs (not raw SQLite):
+
+* Live: [APC Nsight A/B dashboard](https://sudhersankv.github.io/gpu-programming/)
+* Source: repo-root `docs/` (`index.html`, `data.json`, screenshots)
+* CSVs: `profiling/stats/`
+* Rebuild after new traces:
+
+```powershell
+python scripts\export_nsys_stats.py
+python scripts\build_apc_dashboard_data.py
+```
+
+Enable Pages once: repo **Settings → Pages → Deploy from branch → `/docs`**.
+
 ### Phase 6 status
 
-Done for this lab: learn Nsight → automate capture → fair warm on/off comparison → metadata vs KV conclusion.
+Done for this lab: learn Nsight → automate capture → fair warm on/off comparison → metadata vs KV conclusion → static dashboard.
 
 Optional later: NVTX labels per request, keep bench JSONL next to reports, Nsight Compute, PyTorch Profiler on Hugging Face.
 

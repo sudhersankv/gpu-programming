@@ -1,0 +1,357 @@
+{
+  "meta": {
+    "title": "vLLM Automatic Prefix Cache \u2014 Nsight A/B",
+    "model": "Qwen/Qwen2.5-1.5B-Instruct",
+    "gpu": "NVIDIA RTX 4060 Laptop (~8 GB)",
+    "protocol": "Unrelated warmup \u2192 2 shared-prefix Qasper prompts",
+    "caveat": "Whole-session nsys stats include model load + init + warmup + Q1 + Q2. Session HtoD totals look alike; APC shows up in the Events timeline (tiny H\u2192D before kernels on a hit) and in client TTFT on Q2."
+  },
+  "client_ttft": {
+    "source": "Phase 5 shared-prefix bench (cache ON); profile JSONL was not persisted",
+    "series": [
+      {
+        "label": "Q1 (miss)",
+        "ttft_s": 2.3
+      },
+      {
+        "label": "Q2 (hit)",
+        "ttft_s": 0.04
+      }
+    ],
+    "note": "Illustrates the prefix-hit TTFT drop with APC on. Warm ON/OFF profile client timings were not saved to disk."
+  },
+  "cache_off": {
+    "stem": "cache_off_warm",
+    "mem": [
+      {
+        "operation": "memcpy Host-to-Device",
+        "count": 1722,
+        "total_time_ms": 31255.484,
+        "med_ns": 800.0,
+        "total_mb": 3094.884
+      },
+      {
+        "operation": "memset",
+        "count": 4118,
+        "total_time_ms": 5.943,
+        "med_ns": 1313.0,
+        "total_mb": 0.587
+      },
+      {
+        "operation": "memcpy Device-to-Host",
+        "count": 170,
+        "total_time_ms": 0.324,
+        "med_ns": 1664.5,
+        "total_mb": 0.001
+      },
+      {
+        "operation": "memcpy Device-to-Device",
+        "count": 52,
+        "total_time_ms": 0.27,
+        "med_ns": 2688.0,
+        "total_mb": 0.086
+      }
+    ],
+    "kernels": [
+      {
+        "name": "FillFunctor<int> (elementwise)",
+        "full_name": "void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<int>, std::array<char *, (unsigned long)1>>(int, T2, T3)",
+        "time_pct": 33.7,
+        "total_time_ms": 6273.79,
+        "instances": 42693
+      },
+      {
+        "name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stag\u2026",
+        "full_name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_32x1_tn",
+        "time_pct": 29.3,
+        "total_time_ms": 5447.11,
+        "instances": 4536
+      },
+      {
+        "name": "ampere_bf16_s1688gemm_bf16_128x64_sliced1x2_ldg8\u2026",
+        "full_name": "ampere_bf16_s1688gemm_bf16_128x64_sliced1x2_ldg8_f2f_tn",
+        "time_pct": 9.2,
+        "total_time_ms": 1714.45,
+        "instances": 1148
+      },
+      {
+        "name": "triton_poi_fused_mul_silu_1",
+        "full_name": "triton_poi_fused_mul_silu_1",
+        "time_pct": 8.9,
+        "total_time_ms": 1661.26,
+        "instances": 5706
+      },
+      {
+        "name": "triton_poi_fused_cat_3",
+        "full_name": "triton_poi_fused_cat_3",
+        "time_pct": 3.5,
+        "total_time_ms": 650.69,
+        "instances": 8559
+      },
+      {
+        "name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_relu_f2f\u2026",
+        "full_name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_relu_f2f_stages_32x1_tn",
+        "time_pct": 2.3,
+        "total_time_ms": 425.12,
+        "instances": 1316
+      },
+      {
+        "name": "std::enable_if<!T7, void>::type internal::gemvx:\u2026",
+        "full_name": "std::enable_if<!T7, void>::type internal::gemvx::kernel<int, int, __nv_bfloat16, __nv_bfloat16, __nv_bfloat16, float, (bool)0, (bool)1, (bool)1, (bool)0, (int)6, (bool)0, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<__nv_bfloat16>, float>>(T13)",
+        "time_pct": 1.6,
+        "total_time_ms": 300.25,
+        "instances": 338
+      },
+      {
+        "name": "cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_25",
+        "full_name": "void cutlass::Kernel2<cutlass_80_tensorop_bf16_s16816gemm_relu_bf16_256x128_32x3_tn_align8>(T1::Params)",
+        "time_pct": 1.4,
+        "total_time_ms": 261.81,
+        "instances": 2
+      },
+      {
+        "name": "ampere_bf16_s16816gemm_bf16_256x128_ldg8_f2f_sta\u2026",
+        "full_name": "ampere_bf16_s16816gemm_bf16_256x128_ldg8_f2f_stages_32x3_tn",
+        "time_pct": 1.3,
+        "total_time_ms": 238.95,
+        "instances": 56
+      },
+      {
+        "name": "triton_poi_fused_view_5",
+        "full_name": "triton_poi_fused_view_5",
+        "time_pct": 1.0,
+        "total_time_ms": 181.93,
+        "instances": 8559
+      }
+    ],
+    "api": [
+      {
+        "name": "cudaMemcpyAsync",
+        "time_pct": 65.9,
+        "total_time_ms": 36360.89,
+        "num_calls": 1972
+      },
+      {
+        "name": "cudaDeviceSynchronize",
+        "time_pct": 14.0,
+        "total_time_ms": 7741.38,
+        "num_calls": 3034
+      },
+      {
+        "name": "cudaStreamSynchronize",
+        "time_pct": 10.9,
+        "total_time_ms": 6027.63,
+        "num_calls": 831
+      },
+      {
+        "name": "cudaLaunchKernel",
+        "time_pct": 4.3,
+        "total_time_ms": 2391.45,
+        "num_calls": 79653
+      },
+      {
+        "name": "cuLaunchKernel",
+        "time_pct": 1.2,
+        "total_time_ms": 661.35,
+        "num_calls": 59062
+      },
+      {
+        "name": "cudaGraphInstantiateWithFlags",
+        "time_pct": 1.2,
+        "total_time_ms": 658.74,
+        "num_calls": 1978
+      },
+      {
+        "name": "cudaMalloc",
+        "time_pct": 0.6,
+        "total_time_ms": 316.05,
+        "num_calls": 430
+      },
+      {
+        "name": "cudaEventRecordWithFlags",
+        "time_pct": 0.6,
+        "total_time_ms": 304.8,
+        "num_calls": 40657
+      }
+    ],
+    "signals": {
+      "reshape_and_cache": {
+        "name": "vllm::reshape_and_cache_flash",
+        "instances": 1064,
+        "total_time_ms": 11.6
+      },
+      "flash_fwd": {
+        "name": "flash_fwd_splitkv",
+        "instances": 840,
+        "total_time_ms": 168.77
+      }
+    }
+  },
+  "cache_on": {
+    "stem": "cache_on_warm",
+    "mem": [
+      {
+        "operation": "memcpy Host-to-Device",
+        "count": 1722,
+        "total_time_ms": 31603.242,
+        "med_ns": 800.0,
+        "total_mb": 3094.863
+      },
+      {
+        "operation": "memset",
+        "count": 4034,
+        "total_time_ms": 5.599,
+        "med_ns": 1249.0,
+        "total_mb": 0.553
+      },
+      {
+        "operation": "memcpy Device-to-Host",
+        "count": 170,
+        "total_time_ms": 0.322,
+        "med_ns": 1536.5,
+        "total_mb": 0.001
+      },
+      {
+        "operation": "memcpy Device-to-Device",
+        "count": 52,
+        "total_time_ms": 0.272,
+        "med_ns": 2689.0,
+        "total_mb": 0.086
+      }
+    ],
+    "kernels": [
+      {
+        "name": "FillFunctor<int> (elementwise)",
+        "full_name": "void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<int>, std::array<char *, (unsigned long)1>>(int, T2, T3)",
+        "time_pct": 35.0,
+        "total_time_ms": 6390.16,
+        "instances": 42658
+      },
+      {
+        "name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stag\u2026",
+        "full_name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_f2f_stages_32x1_tn",
+        "time_pct": 28.6,
+        "total_time_ms": 5235.81,
+        "instances": 4480
+      },
+      {
+        "name": "ampere_bf16_s1688gemm_bf16_128x64_sliced1x2_ldg8\u2026",
+        "full_name": "ampere_bf16_s1688gemm_bf16_128x64_sliced1x2_ldg8_f2f_tn",
+        "time_pct": 9.4,
+        "total_time_ms": 1714.23,
+        "instances": 1148
+      },
+      {
+        "name": "triton_poi_fused_mul_silu_1",
+        "full_name": "triton_poi_fused_mul_silu_1",
+        "time_pct": 9.1,
+        "total_time_ms": 1669.71,
+        "instances": 5639
+      },
+      {
+        "name": "triton_poi_fused_cat_3",
+        "full_name": "triton_poi_fused_cat_3",
+        "time_pct": 3.6,
+        "total_time_ms": 655.04,
+        "instances": 8532
+      },
+      {
+        "name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_relu_f2f\u2026",
+        "full_name": "ampere_bf16_s1688gemm_bf16_128x128_ldg8_relu_f2f_stages_32x1_tn",
+        "time_pct": 2.2,
+        "total_time_ms": 402.49,
+        "instances": 1288
+      },
+      {
+        "name": "std::enable_if<!T7, void>::type internal::gemvx:\u2026",
+        "full_name": "std::enable_if<!T7, void>::type internal::gemvx::kernel<int, int, __nv_bfloat16, __nv_bfloat16, __nv_bfloat16, float, (bool)0, (bool)1, (bool)1, (bool)0, (int)6, (bool)0, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<const __nv_bfloat16>, cublasGemvTensorStridedBatched<__nv_bfloat16>, float>>(T13)",
+        "time_pct": 1.7,
+        "total_time_ms": 303.38,
+        "instances": 338
+      },
+      {
+        "name": "triton_poi_fused_view_5",
+        "full_name": "triton_poi_fused_view_5",
+        "time_pct": 1.0,
+        "total_time_ms": 182.07,
+        "instances": 8532
+      },
+      {
+        "name": "flash_fwd_splitkv",
+        "full_name": "void flash::flash_fwd_splitkv_kernel<Flash_fwd_kernel_traits<(int)128, (int)64, (int)128, (int)4, (bool)0, (bool)0, cutlass::bfloat16_t, Flash_kernel_traits<(int)128, (int)64, (int)128, (int)4, cutlass::bfloat16_t>>, (bool)0, (bool)0, (bool)0, (bool)0, (bool)1, (bool)0, (bool)0, (bool)0>(flash::Flash_fwd_params)",
+        "time_pct": 0.9,
+        "total_time_ms": 168.23,
+        "instances": 840
+      },
+      {
+        "name": "void flashinfer::sampling::TopKMaskLogitsKernel<\u2026",
+        "full_name": "void flashinfer::sampling::TopKMaskLogitsKernel<(unsigned int)1024, (cub::CUB_200700_750_800_890_900_1000_1200_NS::BlockReduceAlgorithm)2, (unsigned int)4, float, int>(T4 *, T4 *, T5 *, unsigned int, unsigned int)",
+        "time_pct": 0.9,
+        "total_time_ms": 158.07,
+        "instances": 2
+      }
+    ],
+    "api": [
+      {
+        "name": "cudaMemcpyAsync",
+        "time_pct": 65.6,
+        "total_time_ms": 36157.42,
+        "num_calls": 1972
+      },
+      {
+        "name": "cudaDeviceSynchronize",
+        "time_pct": 14.3,
+        "total_time_ms": 7859.2,
+        "num_calls": 3034
+      },
+      {
+        "name": "cudaStreamSynchronize",
+        "time_pct": 11.1,
+        "total_time_ms": 6090.51,
+        "num_calls": 831
+      },
+      {
+        "name": "cudaLaunchKernel",
+        "time_pct": 4.1,
+        "total_time_ms": 2280.26,
+        "num_calls": 79506
+      },
+      {
+        "name": "cuLaunchKernel",
+        "time_pct": 1.1,
+        "total_time_ms": 620.01,
+        "num_calls": 58858
+      },
+      {
+        "name": "cudaGraphInstantiateWithFlags",
+        "time_pct": 1.1,
+        "total_time_ms": 599.2,
+        "num_calls": 1978
+      },
+      {
+        "name": "cudaMalloc",
+        "time_pct": 0.7,
+        "total_time_ms": 409.29,
+        "num_calls": 430
+      },
+      {
+        "name": "cudaEventRecordWithFlags",
+        "time_pct": 0.6,
+        "total_time_ms": 314.84,
+        "num_calls": 40587
+      }
+    ],
+    "signals": {
+      "reshape_and_cache": {
+        "name": "vllm::reshape_and_cache_flash",
+        "instances": 1064,
+        "total_time_ms": 10.54
+      },
+      "flash_fwd": {
+        "name": "flash_fwd_splitkv",
+        "instances": 840,
+        "total_time_ms": 168.23
+      }
+    }
+  }
+}
