@@ -174,9 +174,11 @@ python plot_qasper_prefix.py `
 
 **Goal:** move past TTFT / tok/s numbers and see what the inference runtime is actually doing on CPU and GPU — especially what automatic prefix caching (APC) looks like on the timeline.
 
-Built `llm-lab-vllm:profile` (`docker/Dockerfile.profile`) — same vLLM server image plus **Nsight Systems CLI** from NVIDIA’s **devtools** apt repo. Large `.nsys-rep` traces live under `profiling/reports/` (gitignored); screenshots are checked in under `profiling/screenshots/`.
+Built `llm-lab-vllm:profile` (`docker/Dockerfile.profile`) — same vLLM server image plus **Nsight Systems CLI** from NVIDIA’s **devtools** apt repo. Large `.nsys-rep` traces live under `profiling/reports/` (gitignored); screenshots under `profiling/screenshots/`.
 
-### Mental model
+Read this section **in order**: (1) learn the timeline, (2) automate capture, (3) today’s warm ON/OFF A/B and the APC conclusion. Early literacy screenshots are **not** from the `*_warm` runs.
+
+### 1 — Mental model (before comparing cache modes)
 
 ```text
 Python (vLLM)
@@ -186,7 +188,7 @@ CUDA Runtime API  (CPU issues work)
 GPU hardware      (memcpy / graphs / kernels execute)
 ```
 
-Read the Nsight timeline **horizontally** (time). A vertical slice is “everything happening at one instant.” Typical correlation:
+Read the Nsight timeline **horizontally** (time). A vertical slice is “everything happening at one instant.”
 
 ```text
 VLLM::EngineCore thread
@@ -196,125 +198,97 @@ CUDA Runtime API  (cudaMemcpyAsync, launches, sync)
 GPU Memory Copy / CUDA Graphs / Kernels
 ```
 
-### What showed up in early captures
-
 | Row | Meaning |
 |-----|---------|
-| **CPU / EngineCore** | Host scheduler + KV-cache manager; long `sem_wait` when idle between request bursts |
-| **CUDA Runtime API** | CPU-side commands — *not* GPU compute (`cudaMemcpyAsync`, graph/kernel launches) |
-| **CUDA HW** | Actual device work: memory / kernels / graphs mix |
-| **Default stream 7** | Most GPU work on one stream |
-| **Memcpy HtoD** | Host RAM → GPU HBM (inputs / runtime metadata) |
-| **Kernels** | Many small kernels per transformer step (Triton fused ops, GEMMs, flash-attn, `reshape_and_cache_*`) |
-
-Key distinctions:
+| **CPU / EngineCore** | Host scheduler + KV-cache manager; `sem_wait` when idle |
+| **CUDA Runtime API** | CPU-side commands — *not* GPU compute |
+| **CUDA HW** | Device work: memory / kernels / graphs |
+| **Default stream 7** | Where most GPU work runs |
+| **Memcpy HtoD** | Host RAM → GPU HBM |
+| **Kernels** | Many small kernels per layer (Triton, GEMM, flash-attn, …) |
 
 * CUDA API launch ≠ GPU kernel execution
-* One transformer layer → many GPU kernels (often Triton-generated in vLLM)
-* Idle gaps (`sem_wait` / `poll`) are the server waiting for work, not “broken GPU”
+* One transformer layer → many GPU kernels
+* Idle gaps are “waiting for work,” not a broken GPU
 
-### Reproducible harness — cache ON vs OFF
+### 2 — Early literacy captures (older traces)
 
-`scripts/profile_prefix_cache.py` automates:
+These screenshots are from **earlier** manual / exploratory profiles (e.g. long Qasper server sessions). They teach how to read Nsight. They are **different experiments** from the warm A/B in §4 — do not mix their timelines with `cache_*_warm`.
+
+Full session overview (bursts vs idle):
+
+![Nsight — early overview](profiling/screenshots/nsight_overview_1.png)
+
+EngineCore + CUDA HW:
+
+![Nsight — early EngineCore](profiling/screenshots/nsight_overview_2.png)
+
+Expanded streams / API:
+
+![Nsight — early main timeline](profiling/screenshots/nsight_main.png)
+
+Zoomed memory-heavy window (`cudaMemcpyAsync` ↔ Memcpy HtoD):
+
+![Nsight — early zoomed memcpy](profiling/screenshots/nsight_zoomed.png)
+
+### 3 — Reproducible harness
+
+`scripts/profile_prefix_cache.py`:
 
 1. Launch `llm-lab-vllm:profile` under `nsys profile`
-2. Poll `GET /health` (no blind sleeps)
+2. Poll `GET /health`
 3. **Warm** with one **unrelated** short prompt (does **not** seed the Qasper paper into APC)
-4. Measure **2** shared-prefix Qasper prompts (Q1 = miss, Q2 = hit when APC on)
-5. `docker stop` so Nsight finalizes the `.nsys-rep`
+4. Measure **2** shared-prefix Qasper prompts (Q1 miss → Q2 hit when APC on)
+5. `docker stop` so Nsight writes the `.nsys-rep`
 
-vLLM V1 defaults APC **on** — `--cache off` must pass `--no-enable-prefix-caching`.
+vLLM V1 defaults APC **on** — `--cache off` passes `--no-enable-prefix-caching`.
 
 ```powershell
 python scripts\profile_prefix_cache.py --cache on  --output cache_on_warm
 python scripts\profile_prefix_cache.py --cache off --output cache_off_warm
 ```
 
-### Finding: APC does not HtoD the cached KV
+Reports: `profiling/reports/cache_on_warm.nsys-rep`, `cache_off_warm.nsys-rep`.
+Nsight X-axis = seconds from **capture start** (container start under `nsys`).
 
-Side-by-side warm traces (`cache_off_warm` vs `cache_on_warm`) look similar at zoomed-out scale, but the **Events** view differs at request boundaries.
+### 4 — Today’s warm APC A/B (`*_warm` screenshots)
 
-**Learning**
+Same protocol for both modes: unrelated warmup → Q1 (shared paper) → Q2 (same paper, other question). Screenshots below are **only** from these warm runs.
 
-* Prefix caching does **not** transfer cached KV tensors back to the GPU on a hit.
-* KV for the shared prefix stays **resident in GPU HBM**.
-* On cache-on, Nsight shows a burst of **very small Host→Device memcpys** (sub‑µs to ~12 µs) immediately before transformer kernels.
-* Those copies are consistent with **request metadata** (paged-attention **block tables** / scheduling maps are a strong candidate), so kernels can **point at** already-resident KV.
-* We **cannot** attribute each tiny memcpy exclusively to KV block mappings from the timeline alone — only that the pattern matches metadata, not a bulk KV restore.
-
-| | Cache OFF (re-prefill) | Cache ON (prefix hit) |
-|--|------------------------|------------------------|
-| Shared paper tokens | recomputed | reuse GPU-resident KV |
-| Early HtoD near kernels | not the same tiny-burst signature | many tiny `Memcpy HtoD` then kernels |
-| Client TTFT (warm Q2) | higher (full-ish re-prefill) | lower (suffix + metadata) |
-
-### Screenshots — literacy (first captures)
-
-Full session overview (request bursts vs idle):
-
-![Nsight Systems — full timeline overview](profiling/screenshots/nsight_overview_1.png)
-
-EngineCore + CUDA HW correlation across the run:
-
-![Nsight Systems — EngineCore and GPU activity](profiling/screenshots/nsight_overview_2.png)
-
-Main expanded view (streams, EngineCore, CUDA API):
-
-![Nsight Systems — main expanded timeline](profiling/screenshots/nsight_main.png)
-
-Zoomed into a memory-heavy window (`cudaMemcpyAsync` ↔ Memcpy HtoD on stream 7):
-
-![Nsight Systems — zoomed memcpy / CUDA API](profiling/screenshots/nsight_zoomed.png)
-
-### Screenshots — warm APC A/B (`cache_off_warm` vs `cache_on_warm`)
-
-Zoomed-out timelines (similar overall shape; compare the measured bursts near the end):
+**4a — Zoomed out:** overall shape looks similar; measured work is in the later bursts (after long init).
 
 ![Warm cache off vs on — zoomed out](profiling/screenshots/warm_cache_off_vs_cache_on_xoomed_out.png)
 
-Zoomed Events view — left OFF (kernel stream), right ON (tiny HtoD metadata burst then kernels):
+**4b — Zoomed Events:** left = `cache_off_warm`, right = `cache_on_warm`. Cache-on shows a burst of **tiny** `Memcpy HtoD` immediately before transformer kernels; cache-off’s window is dominated by the kernel stream without that same tiny-burst signature.
 
-![Warm cache off vs on — events / metadata HtoD](profiling/screenshots/warm_cache_off_vs_cache_on.png)
+![Warm cache off vs on — events](profiling/screenshots/warm_cache_off_vs_cache_on.png)
 
-Kernel-level detail in the request window:
+**4c — Kernel detail** in the request window:
 
 ![Warm A/B — kernel zoom](profiling/screenshots/zoomed_kernel.png)
 
-### How to capture (manual, optional)
+### 5 — Reading (from the warm A/B only)
 
-```powershell
-# build once
-cd docker
-docker build -f Dockerfile.profile -t llm-lab-vllm:profile .
+* Prefix caching does **not** transfer cached KV tensors Host→Device on a hit.
+* Shared-prefix KV stays **resident in GPU HBM**.
+* Cache-on: Nsight shows **very small H→D memcpys** (sub‑µs–~12 µs) before kernels — consistent with **request metadata** (paged-attention **block tables** / related maps are strong candidates) so kernels **point at** already-resident KV.
+* We **cannot** prove each tiny memcpy is exclusively a KV block-table update from this trace alone — only that the pattern is metadata-sized, not a bulk KV restore.
 
-# prefer the automated harness above; manual path still works:
-New-Item -ItemType Directory -Force -Path profiling\reports | Out-Null
+| | Cache OFF (`cache_off_warm`) | Cache ON (`cache_on_warm`) |
+|--|------------------------------|----------------------------|
+| Shared paper tokens | recomputed (re-prefill) | reuse GPU-resident KV |
+| Early HtoD near kernels | no tiny-burst metadata signature | many tiny `Memcpy HtoD` then kernels |
+| Client TTFT on warm Q2 | higher | lower |
 
-docker run --rm -it `
-  --gpus all --ipc=host --cap-add=SYS_ADMIN -p 8000:8000 `
-  -v ${env:USERPROFILE}\.cache\huggingface:/root/.cache/huggingface `
-  -v ${PWD}\profiling\reports:/reports `
-  --entrypoint nsys `
-  llm-lab-vllm:profile `
-  profile `
-  --trace=cuda,nvtx,osrt `
-  --sample=process-tree `
-  --output=/reports/manual_capture `
-  --force-overwrite=true `
-  /usr/bin/python3 -m vllm.entrypoints.openai.api_server `
-  --model Qwen/Qwen2.5-1.5B-Instruct `
-  --max-model-len 4096 `
-  --gpu-memory-utilization 0.85 `
-  --enable-prefix-caching
-```
+### Manual capture (optional)
 
-Open `.nsys-rep` in the **Nsight Systems** GUI on Windows. Timeline origin is capture start (container start under `nsys`), not wall-clock UTC.
+Prefer the harness in §3. Manual `docker run … --entrypoint nsys … /usr/bin/python3 -m vllm…` still works; open `.nsys-rep` in the Windows Nsight GUI.
 
 ### Phase 6 status
 
-**Complete** for literacy + APC evidence (harness, warm ON/OFF, metadata-vs-KV conclusion).
+**Complete** for timeline literacy (§1–2) + warm APC evidence (§3–5).
 
-Optional later (Phase 6.1): NVTX markers per request, persist bench JSONL next to reports, Nsight Compute, PyTorch Profiler on HF.
+Optional later (Phase 6.1): NVTX per request, persist bench JSONL beside reports, Nsight Compute, PyTorch Profiler on HF.
 
 ---
 
