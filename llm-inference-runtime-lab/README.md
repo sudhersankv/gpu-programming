@@ -213,7 +213,7 @@ GPU Memory Copy / CUDA Graphs / Kernels
 
 ### 2 — Early literacy captures (older traces)
 
-These screenshots are from **earlier** manual / exploratory profiles (e.g. long Qasper server sessions). They teach how to read Nsight. They are **different experiments** from the warm A/B in §4 — do not mix their timelines with `cache_*_warm`.
+These screenshots are from **earlier** exploratory profiles of `qasper_shared_cache_on.nsys-rep` (before the warm harness). They only teach how to read Nsight rows (EngineCore, CUDA API, streams, kernels). They are **not** today’s `cache_on_warm` / `cache_off_warm` A/B — skip ahead to §4 for that.
 
 Full session overview (bursts vs idle):
 
@@ -227,9 +227,13 @@ Expanded streams / API:
 
 ![Nsight — early main timeline](profiling/screenshots/nsight_main.png)
 
-Zoomed memory-heavy window (`cudaMemcpyAsync` ↔ Memcpy HtoD):
+Early zoom: dense `cudaMemcpyAsync` on the CPU side lined up with `Memcpy HtoD` on the GPU (same older report — literacy only):
 
 ![Nsight — early zoomed memcpy](profiling/screenshots/nsight_zoomed.png)
+
+Same early report, kernels expanded (`vectorized_elementwise_*`, Triton fused ops):
+
+![Nsight — early kernel groups](profiling/screenshots/zoomed_kernel.png)
 
 ### 3 — Reproducible harness
 
@@ -263,9 +267,7 @@ Same protocol for both modes: unrelated warmup → Q1 (shared paper) → Q2 (sam
 
 ![Warm cache off vs on — events](profiling/screenshots/warm_cache_off_vs_cache_on.png)
 
-**4c — Kernel detail** in the request window:
-
-![Warm A/B — kernel zoom](profiling/screenshots/zoomed_kernel.png)
+(Only `warm_*` screenshots belong in this section — not the older `nsight_*` / `zoomed_kernel` literacy shots.)
 
 ### 5 — Reading (from the warm A/B only)
 
