@@ -365,36 +365,105 @@
 
       const off = data.cache_off;
       const on = data.cache_on;
+      const sql = data.sqlite;
+      if (!sql?.cache_off || !sql?.cache_on) {
+        document.getElementById("app").innerHTML =
+          `<div class="error">data.json is missing the <code>sqlite</code> section. Run <code>python scripts/query_nsys_sqlite.py</code> locally (needs .sqlite next to the .nsys-rep files).</div>`;
+        return;
+      }
+      const sOff = sql.cache_off;
+      const sOn = sql.cache_on;
       const htodOff = memByOp(off, "Host-to-Device");
       const htodOn = memByOp(on, "Host-to-Device");
-      const dtohOff = memByOp(off, "Device-to-Host");
-      const dtohOn = memByOp(on, "Device-to-Host");
+      const kernOff = sOff.kernels_late_30s.total_time_ms;
+      const kernOn = sOn.kernels_late_30s.total_time_ms;
+      const ratio = kernOff / kernOn;
 
       const app = document.getElementById("app");
       app.innerHTML = `
         <section>
-          <h2>Session snapshot</h2>
+          <h2>Where APC shows up (SQLite · last 30s of trace)</h2>
           <div class="grid grid-4">
             <div class="panel kpi">
-              <span class="label">HtoD count · OFF</span>
-              <span class="value" style="color:${OFF}">${fmt(htodOff.count)}</span>
-              <span class="sub">${fmt(htodOff.total_mb, 1)} MB · med ${fmt(htodOff.med_ns)} ns</span>
+              <span class="label">GPU kernel time · OFF</span>
+              <span class="value" style="color:${OFF}">${fmt(kernOff / 1000, 2)}s</span>
+              <span class="sub">${fmt(sOff.kernels_late_30s.count)} launches</span>
             </div>
             <div class="panel kpi">
-              <span class="label">HtoD count · ON</span>
-              <span class="value" style="color:${ON}">${fmt(htodOn.count)}</span>
-              <span class="sub">${fmt(htodOn.total_mb, 1)} MB · med ${fmt(htodOn.med_ns)} ns</span>
+              <span class="label">GPU kernel time · ON</span>
+              <span class="value" style="color:${ON}">${fmt(kernOn / 1000, 2)}s</span>
+              <span class="sub">${fmt(sOn.kernels_late_30s.count)} launches</span>
             </div>
             <div class="panel kpi">
-              <span class="label">Top kernel time · OFF</span>
-              <span class="value">${fmt(off.kernels[0].total_time_ms / 1000, 1)}s</span>
-              <span class="sub">${off.kernels[0].name}</span>
+              <span class="label">OFF / ON kernel time</span>
+              <span class="value">${fmt(ratio, 2)}×</span>
+              <span class="sub">Cache OFF recomputes more prefill work</span>
             </div>
             <div class="panel kpi">
-              <span class="label">Top kernel time · ON</span>
-              <span class="value">${fmt(on.kernels[0].total_time_ms / 1000, 1)}s</span>
-              <span class="sub">${on.kernels[0].name}</span>
+              <span class="label">ampere GEMM · last 30s</span>
+              <span class="value">${fmt(sOff.kernels_late_30s.signals.gemm_ampere.total_time_ms / 1000, 2)}s / ${fmt(sOn.kernels_late_30s.signals.gemm_ampere.total_time_ms / 1000, 2)}s</span>
+              <span class="sub">OFF vs ON</span>
             </div>
+          </div>
+          <div class="panel" style="margin-top:1.1rem">
+            <div class="legend">
+              <span class="swatch off"><i></i> Cache OFF</span>
+              <span class="swatch on"><i></i> Cache ON</span>
+            </div>
+            <div class="chart-box"><canvas id="lateKernChart"></canvas></div>
+            <p class="note">${sOff.sqlite_window.note} Queried from <code>CUPTI_ACTIVITY_KIND_KERNEL</code>.</p>
+          </div>
+        </section>
+
+        <section>
+          <h2>HtoD split: tiny metadata vs large weight uploads</h2>
+          <div class="legend">
+            <span class="swatch off"><i></i> Cache OFF</span>
+            <span class="swatch on"><i></i> Cache ON</span>
+          </div>
+          <div class="grid grid-2">
+            <div class="panel">
+              <div class="chart-box"><canvas id="htodSplitCount"></canvas></div>
+              <p class="note">Session totals: large (≥1&nbsp;MB) copies are the ~3&nbsp;GB model load — same on both. Tiny (&lt;4&nbsp;KB) counts are also similar; APC is not “fewer memcpys overall.”</p>
+            </div>
+            <div class="panel">
+              <div class="chart-box"><canvas id="htodSplitTime"></canvas></div>
+              <p class="note">Almost all HtoD <em>time</em> is large uploads. Tiny copies are sub‑millisecond in aggregate — visible on the Events timeline, not in session time bars.</p>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:1.1rem">
+            <table class="compare">
+              <thead>
+                <tr><th>Metric (from SQLite)</th><th>OFF</th><th>ON</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Session HtoD all</td>
+                  <td class="num">${fmt(sOff.htod_session.all_htod.count)} · ${fmt(sOff.htod_session.all_htod.total_mb, 1)} MB</td>
+                  <td class="num">${fmt(sOn.htod_session.all_htod.count)} · ${fmt(sOn.htod_session.all_htod.total_mb, 1)} MB</td>
+                </tr>
+                <tr>
+                  <td>Session HtoD ≥1&nbsp;MB (weights)</td>
+                  <td class="num">${fmt(sOff.htod_session.large_ge_1mb.count)} · ${fmt(sOff.htod_session.large_ge_1mb.total_mb, 1)} MB</td>
+                  <td class="num">${fmt(sOn.htod_session.large_ge_1mb.count)} · ${fmt(sOn.htod_session.large_ge_1mb.total_mb, 1)} MB</td>
+                </tr>
+                <tr>
+                  <td>Session HtoD &lt;4&nbsp;KB (tiny)</td>
+                  <td class="num">${fmt(sOff.htod_session.tiny_lt_4kb.count)} · ${fmt(sOff.htod_session.tiny_lt_4kb.total_mb, 3)} MB</td>
+                  <td class="num">${fmt(sOn.htod_session.tiny_lt_4kb.count)} · ${fmt(sOn.htod_session.tiny_lt_4kb.total_mb, 3)} MB</td>
+                </tr>
+                <tr>
+                  <td>Last 30s flash_fwd time</td>
+                  <td class="num">${fmt(sOff.kernels_late_30s.signals.flash_fwd.total_time_ms, 1)} ms · n=${fmt(sOff.kernels_late_30s.signals.flash_fwd.instances)}</td>
+                  <td class="num">${fmt(sOn.kernels_late_30s.signals.flash_fwd.total_time_ms, 1)} ms · n=${fmt(sOn.kernels_late_30s.signals.flash_fwd.instances)}</td>
+                </tr>
+                <tr>
+                  <td>Last 30s reshape_and_cache</td>
+                  <td class="num">${fmt(sOff.kernels_late_30s.signals.reshape_and_cache.instances)} · ${fmt(sOff.kernels_late_30s.signals.reshape_and_cache.total_time_ms, 2)} ms</td>
+                  <td class="num">${fmt(sOn.kernels_late_30s.signals.reshape_and_cache.instances)} · ${fmt(sOn.kernels_late_30s.signals.reshape_and_cache.total_time_ms, 2)} ms</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -407,7 +476,7 @@
         </section>
 
         <section>
-          <h2>Memory transfers</h2>
+          <h2>Whole-session nsys stats (why the old chart looked “wrong”)</h2>
           <div class="legend">
             <span class="swatch off"><i></i> Cache OFF</span>
             <span class="swatch on"><i></i> Cache ON</span>
@@ -415,61 +484,11 @@
           <div class="grid grid-2">
             <div class="panel">
               <div class="chart-box"><canvas id="memCountChart"></canvas></div>
-              <p class="note">Whole-session copy counts. Nearly identical — model load dominates.</p>
+              <p class="note">Identical HtoD counts (${fmt(htodOff.count)}) are correct for the full capture — not a bad export.</p>
             </div>
-            <div class="panel">
-              <div class="chart-box"><canvas id="memTimeChart"></canvas></div>
-              <p class="note">Total HtoD time is dominated by weight upload, not Q2.</p>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2>Top kernels by total GPU time</h2>
-          <div class="legend">
-            <span class="swatch off"><i></i> Cache OFF</span>
-            <span class="swatch on"><i></i> Cache ON</span>
-          </div>
-          <div class="panel">
-            <div class="chart-box tall"><canvas id="kernChart"></canvas></div>
-          </div>
-        </section>
-
-        <section>
-          <h2>CUDA API (CPU-side)</h2>
-          <div class="grid grid-2">
             <div class="panel">
               <div class="chart-box"><canvas id="apiChart"></canvas></div>
-            </div>
-            <div class="panel">
-              <table class="compare">
-                <thead>
-                  <tr><th>Signal</th><th>OFF</th><th>ON</th></tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>reshape_and_cache calls</td>
-                    <td class="num">${fmt(off.signals.reshape_and_cache?.instances ?? 0)}</td>
-                    <td class="num">${fmt(on.signals.reshape_and_cache?.instances ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>flash_fwd instances</td>
-                    <td class="num">${fmt(off.signals.flash_fwd?.instances ?? 0)}</td>
-                    <td class="num">${fmt(on.signals.flash_fwd?.instances ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>cudaMemcpyAsync calls</td>
-                    <td class="num">${fmt(off.api.find(a => a.name === "cudaMemcpyAsync")?.num_calls ?? 0)}</td>
-                    <td class="num">${fmt(on.api.find(a => a.name === "cudaMemcpyAsync")?.num_calls ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>DtoH count</td>
-                    <td class="num">${fmt(dtohOff.count)}</td>
-                    <td class="num">${fmt(dtohOn.count)}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p class="note">Session aggregates wash out the per-request APC signature — use the timeline below.</p>
+              <p class="note">CPU-side CUDA API time also dominated by load / sync, not Q2.</p>
             </div>
           </div>
         </section>
@@ -492,14 +511,125 @@
           <h2>Takeaways</h2>
           <div class="panel">
             <ul class="takeaways">
-              <li>Prefix-cache hits do <strong>not</strong> H→D restore shared KV; KV stays resident in GPU HBM.</li>
-              <li>On a hit, Nsight shows tiny H→D memcpys consistent with request metadata (e.g. block tables), then kernels reuse resident KV.</li>
-              <li>Whole-session <code>nsys stats</code> HtoD counts match (both ${fmt(htodOff.count)}) because load/init dwarf Q2.</li>
+              <li>In the <strong>last 30s</strong> of each trace (after weight upload), cache OFF spends <strong>${fmt(ratio, 2)}×</strong> more GPU kernel time than cache ON — mostly GEMM / attention prefill.</li>
+              <li>Prefix-cache hits do <strong>not</strong> H→D restore shared KV; that KV stays in GPU HBM. Session HtoD totals stay ~identical (~${fmt(htodOff.total_mb, 0)} MB).</li>
+              <li>Tiny HtoD copies exist on both runs; the GUI “burst before kernels” is a timing pattern on a hit, while the quantitative win is <strong>less compute</strong>, not fewer session memcpys.</li>
               <li>Client TTFT still drops on the second shared-prefix question when APC is on.</li>
             </ul>
           </div>
         </section>
       `;
+
+      // Late-window kernel signals (SQLite)
+      const sigKeys = [
+        ["gemm_ampere", "ampere GEMM"],
+        ["flash_fwd", "flash_fwd"],
+        ["reshape_and_cache", "reshape_and_cache"],
+        ["triton_silu", "triton silu"],
+      ];
+      new Chart(document.getElementById("lateKernChart"), {
+        type: "bar",
+        data: {
+          labels: sigKeys.map(([, label]) => label),
+          datasets: [
+            {
+              label: "OFF ms",
+              data: sigKeys.map(([k]) => sOff.kernels_late_30s.signals[k].total_time_ms),
+              backgroundColor: OFF,
+              borderRadius: 6,
+            },
+            {
+              label: "ON ms",
+              data: sigKeys.map(([k]) => sOn.kernels_late_30s.signals[k].total_time_ms),
+              backgroundColor: ON,
+              borderRadius: 6,
+            },
+          ],
+        },
+        options: {
+          ...chartDefaults,
+          plugins: {
+            ...chartDefaults.plugins,
+            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
+          },
+          scales: {
+            ...chartDefaults.scales,
+            y: {
+              ...chartDefaults.scales.y,
+              title: { display: true, text: "GPU time in last 30s (ms)", color: MUTED, font: { family: "Outfit" } },
+            },
+          },
+        },
+      });
+
+      // Tiny vs large HtoD counts
+      new Chart(document.getElementById("htodSplitCount"), {
+        type: "bar",
+        data: {
+          labels: ["Tiny <4KB", "Large ≥1MB"],
+          datasets: [
+            {
+              label: "OFF",
+              data: [
+                sOff.htod_session.tiny_lt_4kb.count,
+                sOff.htod_session.large_ge_1mb.count,
+              ],
+              backgroundColor: OFF,
+              borderRadius: 6,
+            },
+            {
+              label: "ON",
+              data: [
+                sOn.htod_session.tiny_lt_4kb.count,
+                sOn.htod_session.large_ge_1mb.count,
+              ],
+              backgroundColor: ON,
+              borderRadius: 6,
+            },
+          ],
+        },
+        options: {
+          ...chartDefaults,
+          plugins: {
+            ...chartDefaults.plugins,
+            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
+          },
+        },
+      });
+
+      new Chart(document.getElementById("htodSplitTime"), {
+        type: "bar",
+        data: {
+          labels: ["Tiny <4KB (ms)", "Large ≥1MB (s)"],
+          datasets: [
+            {
+              label: "OFF",
+              data: [
+                sOff.htod_session.tiny_lt_4kb.total_time_ms,
+                sOff.htod_session.large_ge_1mb.total_time_ms / 1000,
+              ],
+              backgroundColor: OFF,
+              borderRadius: 6,
+            },
+            {
+              label: "ON",
+              data: [
+                sOn.htod_session.tiny_lt_4kb.total_time_ms,
+                sOn.htod_session.large_ge_1mb.total_time_ms / 1000,
+              ],
+              backgroundColor: ON,
+              borderRadius: 6,
+            },
+          ],
+        },
+        options: {
+          ...chartDefaults,
+          plugins: {
+            ...chartDefaults.plugins,
+            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
+          },
+        },
+      });
 
       // TTFT
       new Chart(document.getElementById("ttftChart"), {
@@ -551,67 +681,6 @@
           plugins: {
             ...chartDefaults.plugins,
             legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
-          },
-        },
-      });
-
-      new Chart(document.getElementById("memTimeChart"), {
-        type: "bar",
-        data: {
-          labels: ["HtoD total time (s)"],
-          datasets: [
-            { label: "OFF", data: [htodOff.total_time_ms / 1000], backgroundColor: OFF, borderRadius: 6, maxBarThickness: 64 },
-            { label: "ON", data: [htodOn.total_time_ms / 1000], backgroundColor: ON, borderRadius: 6, maxBarThickness: 64 },
-          ],
-        },
-        options: {
-          ...chartDefaults,
-          plugins: {
-            ...chartDefaults.plugins,
-            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
-          },
-        },
-      });
-
-      // Align kernel names: union of top-8 short names by OFF order, match ON by full_name prefix / short name
-      const topN = 8;
-      const kernLabels = off.kernels.slice(0, topN).map((k) => k.name);
-      const onByName = Object.fromEntries(on.kernels.map((k) => [k.name, k]));
-      new Chart(document.getElementById("kernChart"), {
-        type: "bar",
-        data: {
-          labels: kernLabels,
-          datasets: [
-            {
-              label: "OFF ms",
-              data: off.kernels.slice(0, topN).map((k) => k.total_time_ms),
-              backgroundColor: OFF,
-              borderRadius: 4,
-            },
-            {
-              label: "ON ms",
-              data: kernLabels.map((name) => onByName[name]?.total_time_ms ?? 0),
-              backgroundColor: ON,
-              borderRadius: 4,
-            },
-          ],
-        },
-        options: {
-          indexAxis: "y",
-          ...chartDefaults,
-          plugins: {
-            ...chartDefaults.plugins,
-            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
-          },
-          scales: {
-            x: {
-              ...chartDefaults.scales.x,
-              title: { display: true, text: "Total GPU time (ms)", color: MUTED, font: { family: "Outfit" } },
-            },
-            y: {
-              ticks: { color: MUTED, font: { family: "IBM Plex Mono", size: 10 } },
-              grid: { display: false },
-            },
           },
         },
       });

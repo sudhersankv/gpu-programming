@@ -269,16 +269,19 @@ At a glance the two timelines still look alike. The difference shows up when you
 
 ### Dashboard (GitHub Pages)
 
-Static comparison page built from `nsys stats` CSVs (not raw SQLite):
+Static comparison page built from `nsys stats` CSVs **plus** filtered queries on the local Nsight `.sqlite` exports:
 
 * Live: [APC Nsight A/B dashboard](https://sudhersankv.github.io/gpu-programming/)
 * Source: repo-root `docs/` (`index.html`, `data.json`, screenshots)
 * CSVs: `profiling/stats/`
-* Rebuild after new traces:
+* SQLite (local only, gitignored): `profiling/reports/*.sqlite` → `scripts/query_nsys_sqlite.py`
+
+Rebuild after new traces:
 
 ```powershell
 python scripts\export_nsys_stats.py
 python scripts\build_apc_dashboard_data.py
+python scripts\query_nsys_sqlite.py
 ```
 
 Enable Pages once: repo **Settings → Pages → Deploy from branch → `/docs`**.

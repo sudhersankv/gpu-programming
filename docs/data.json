@@ -4,7 +4,11 @@
     "model": "Qwen/Qwen2.5-1.5B-Instruct",
     "gpu": "NVIDIA RTX 4060 Laptop (~8 GB)",
     "protocol": "Unrelated warmup \u2192 2 shared-prefix Qasper prompts",
-    "caveat": "Whole-session nsys stats include model load + init + warmup + Q1 + Q2. Session HtoD totals look alike; APC shows up in the Events timeline (tiny H\u2192D before kernels on a hit) and in client TTFT on Q2."
+    "caveat": "Whole-session HtoD totals match because ~3GB weight upload dominates. SQLite-filtered view: split tiny vs large HtoD, and kernel time in the last 30s of each trace (after load) \u2014 that is where cache OFF does more prefill GEMM / attention work.",
+    "data_sources": [
+      "nsys stats CSVs (session kernel/API summaries)",
+      "CUPTI_ACTIVITY_KIND_MEMCPY + CUPTI_ACTIVITY_KIND_KERNEL from local .sqlite"
+    ]
   },
   "client_ttft": {
     "source": "Phase 5 shared-prefix bench (cache ON); profile JSONL was not persisted",
@@ -351,6 +355,234 @@
         "name": "flash_fwd_splitkv",
         "instances": 840,
         "total_time_ms": 168.23
+      }
+    }
+  },
+  "sqlite": {
+    "cache_off": {
+      "sqlite_window": {
+        "label": "last_30s_of_trace",
+        "window_s": 30,
+        "note": "Approx request era after model load; large HtoD weights finish earlier (~first half of capture)."
+      },
+      "htod_session": {
+        "tiny_lt_4kb": {
+          "count": 1512,
+          "total_mb": 1.0907,
+          "total_time_ms": 1.584
+        },
+        "large_ge_1mb": {
+          "count": 142,
+          "total_mb": 3049.39,
+          "total_time_ms": 31228.211
+        },
+        "all_htod": {
+          "count": 1722,
+          "total_mb": 3094.884,
+          "total_time_ms": 31255.484
+        }
+      },
+      "htod_late_30s": {
+        "tiny_lt_4kb": {
+          "count": 1012,
+          "total_mb": 0.5901,
+          "total_time_ms": 0.933
+        },
+        "large_ge_1mb": {
+          "count": 0,
+          "total_mb": 0.0,
+          "total_time_ms": 0.0
+        },
+        "all_htod": {
+          "count": 1020,
+          "total_mb": 0.65,
+          "total_time_ms": 0.961
+        }
+      },
+      "kernels_late_30s": {
+        "count": 18638,
+        "total_time_ms": 3444.75,
+        "top": [
+          {
+            "name": "ampere_bf16_s1688gemm_bf16_128_3...",
+            "full_name": "ampere_bf16_s1688gemm_bf16_128_3...",
+            "instances": 1260,
+            "total_time_ms": 1483.89
+          },
+          {
+            "name": "Kernel2",
+            "full_name": "Kernel2",
+            "instances": 897,
+            "total_time_ms": 359.58
+          },
+          {
+            "name": "ampere_bf16_s1688gemm_bf16_128_7...",
+            "full_name": "ampere_bf16_s1688gemm_bf16_128_7...",
+            "instances": 336,
+            "total_time_ms": 308.9
+          },
+          {
+            "name": "kernel",
+            "full_name": "kernel",
+            "instances": 338,
+            "total_time_ms": 300.25
+          },
+          {
+            "name": "ampere_bf16_s16816gemm_bf16_25_16...",
+            "full_name": "ampere_bf16_s16816gemm_bf16_25_16...",
+            "instances": 56,
+            "total_time_ms": 238.95
+          },
+          {
+            "name": "flash_fwd_splitkv_kernel",
+            "full_name": "flash_fwd_splitkv_kernel",
+            "instances": 1064,
+            "total_time_ms": 215.57
+          },
+          {
+            "name": "ampere_bf16_s1688gemm_bf16_128_2...",
+            "full_name": "ampere_bf16_s1688gemm_bf16_128_2...",
+            "instances": 392,
+            "total_time_ms": 112.67
+          },
+          {
+            "name": "TopKMaskLogitsKernel",
+            "full_name": "TopKMaskLogitsKernel",
+            "instances": 1,
+            "total_time_ms": 56.58
+          }
+        ],
+        "signals": {
+          "gemm_ampere": {
+            "instances": 3136,
+            "total_time_ms": 2343.72
+          },
+          "flash_fwd": {
+            "instances": 1204,
+            "total_time_ms": 217.21
+          },
+          "reshape_and_cache": {
+            "instances": 1064,
+            "total_time_ms": 11.6
+          },
+          "triton_silu": {
+            "instances": 1064,
+            "total_time_ms": 53.15
+          }
+        }
+      }
+    },
+    "cache_on": {
+      "sqlite_window": {
+        "label": "last_30s_of_trace",
+        "window_s": 30,
+        "note": "Approx request era after model load; large HtoD weights finish earlier (~first half of capture)."
+      },
+      "htod_session": {
+        "tiny_lt_4kb": {
+          "count": 1515,
+          "total_mb": 1.0911,
+          "total_time_ms": 1.591
+        },
+        "large_ge_1mb": {
+          "count": 142,
+          "total_mb": 3049.39,
+          "total_time_ms": 31575.537
+        },
+        "all_htod": {
+          "count": 1722,
+          "total_mb": 3094.863,
+          "total_time_ms": 31603.242
+        }
+      },
+      "htod_late_30s": {
+        "tiny_lt_4kb": {
+          "count": 885,
+          "total_mb": 0.4431,
+          "total_time_ms": 0.779
+        },
+        "large_ge_1mb": {
+          "count": 0,
+          "total_mb": 0.0,
+          "total_time_ms": 0.0
+        },
+        "all_htod": {
+          "count": 890,
+          "total_mb": 0.481,
+          "total_time_ms": 0.798
+        }
+      },
+      "kernels_late_30s": {
+        "count": 8757,
+        "total_time_ms": 1442.62,
+        "top": [
+          {
+            "name": "ampere_bf16_s1688gemm_bf16_128_3...",
+            "full_name": "ampere_bf16_s1688gemm_bf16_128_3...",
+            "instances": 125,
+            "total_time_ms": 413.1
+          },
+          {
+            "name": "kernel",
+            "full_name": "kernel",
+            "instances": 226,
+            "total_time_ms": 288.17
+          },
+          {
+            "name": "ampere_bf16_s16816gemm_bf16_25_16...",
+            "full_name": "ampere_bf16_s16816gemm_bf16_25_16...",
+            "instances": 28,
+            "total_time_ms": 138.85
+          },
+          {
+            "name": "TopKMaskLogitsKernel",
+            "full_name": "TopKMaskLogitsKernel",
+            "instances": 1,
+            "total_time_ms": 113.35
+          },
+          {
+            "name": "Kernel2",
+            "full_name": "Kernel2",
+            "instances": 630,
+            "total_time_ms": 87.27
+          },
+          {
+            "name": "unrolled_elementwise_kernel",
+            "full_name": "unrolled_elementwise_kernel",
+            "instances": 686,
+            "total_time_ms": 70.96
+          },
+          {
+            "name": "flash_fwd_splitkv_kernel",
+            "full_name": "flash_fwd_splitkv_kernel",
+            "instances": 461,
+            "total_time_ms": 53.89
+          },
+          {
+            "name": "ampere_bf16_s1688gemm_bf16_128_7...",
+            "full_name": "ampere_bf16_s1688gemm_bf16_128_7...",
+            "instances": 112,
+            "total_time_ms": 45.81
+          }
+        ],
+        "signals": {
+          "gemm_ampere": {
+            "instances": 880,
+            "total_time_ms": 730.78
+          },
+          "flash_fwd": {
+            "instances": 601,
+            "total_time_ms": 55.54
+          },
+          "reshape_and_cache": {
+            "instances": 461,
+            "total_time_ms": 4.25
+          },
+          "triton_silu": {
+            "instances": 406,
+            "total_time_ms": 41.26
+          }
+        }
       }
     }
   }
