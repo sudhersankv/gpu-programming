@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>APC Nsight A/B — LLM Inference Runtime Lab</title>
+  <title>Profiling vLLM Automatic Prefix Caching</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -21,7 +21,6 @@
       --shadow: 0 18px 50px rgba(20, 33, 43, 0.08);
       --radius: 18px;
     }
-
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
@@ -34,178 +33,93 @@
         linear-gradient(180deg, #e8eef2 0%, var(--paper) 40%, #eef3f5 100%);
       min-height: 100vh;
     }
-
-    .wrap {
-      width: min(1120px, calc(100% - 2rem));
-      margin: 0 auto;
-      padding: 2.5rem 0 4rem;
-    }
-
-    header.hero {
-      display: grid;
-      gap: 1rem;
-      margin-bottom: 2rem;
-      padding: 1.75rem 0 0.5rem;
-    }
-
+    .wrap { width: min(1080px, calc(100% - 2rem)); margin: 0 auto; padding: 2.25rem 0 3.5rem; }
     .eyebrow {
       font-family: "IBM Plex Mono", monospace;
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--accent);
       font-weight: 500;
+      margin: 0 0 0.65rem;
     }
-
     h1 {
       margin: 0;
-      font-size: clamp(1.85rem, 4vw, 2.75rem);
+      font-size: clamp(1.85rem, 4.2vw, 2.65rem);
       font-weight: 700;
       letter-spacing: -0.03em;
-      line-height: 1.1;
-      max-width: 16ch;
+      line-height: 1.12;
+      max-width: 18ch;
     }
-
     .lede {
-      margin: 0;
-      max-width: 42rem;
+      margin: 0.85rem 0 0;
+      max-width: 40rem;
       color: var(--muted);
       font-size: 1.05rem;
       line-height: 1.55;
     }
-
-    .meta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.55rem;
-      margin-top: 0.35rem;
-    }
-
+    .meta-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
     .chip {
       font-family: "IBM Plex Mono", monospace;
-      font-size: 0.75rem;
-      padding: 0.35rem 0.65rem;
+      font-size: 0.72rem;
+      padding: 0.32rem 0.6rem;
       border-radius: 999px;
       background: rgba(255,255,255,0.7);
       border: 1px solid var(--line);
-      color: var(--ink);
     }
-
-    .caveat {
-      margin-top: 0.5rem;
-      padding: 0.9rem 1rem;
-      border-left: 3px solid var(--accent);
-      background: rgba(255,255,255,0.55);
-      border-radius: 0 12px 12px 0;
-      color: var(--muted);
-      font-size: 0.92rem;
-      line-height: 1.5;
-    }
-
-    .grid {
-      display: grid;
-      gap: 1.1rem;
-    }
-
-    .grid-2 {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .grid-4 {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    @media (max-width: 860px) {
-      .grid-2, .grid-4 { grid-template-columns: 1fr; }
-    }
-
-    section {
-      margin-top: 1.75rem;
-    }
-
+    section { margin-top: 2rem; }
     section h2 {
       margin: 0 0 0.75rem;
-      font-size: 1.15rem;
+      font-size: 1.2rem;
       letter-spacing: -0.02em;
     }
-
+    .grid { display: grid; gap: 1rem; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    @media (max-width: 860px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      h1 { max-width: none; }
+    }
     .panel {
       background: var(--panel);
       backdrop-filter: blur(10px);
       border: 1px solid var(--line);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
-      padding: 1.15rem 1.2rem 1.25rem;
+      padding: 1.1rem 1.15rem 1.2rem;
     }
-
-    .panel p.note {
-      margin: 0.35rem 0 0;
+    .panel p, .panel .note, .panel li {
       color: var(--muted);
-      font-size: 0.86rem;
-      line-height: 1.45;
+      font-size: 0.92rem;
+      line-height: 1.5;
     }
-
-    .kpi {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-      min-height: 100%;
-    }
-
+    .panel p { margin: 0.5rem 0 0; }
+    .panel .note { margin: 0.55rem 0 0; font-size: 0.85rem; }
+    .kpi { display: flex; flex-direction: column; gap: 0.3rem; min-height: 100%; }
     .kpi .label {
       font-family: "IBM Plex Mono", monospace;
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--muted);
     }
-
     .kpi .value {
-      font-size: 1.65rem;
+      font-size: clamp(1.55rem, 3vw, 2rem);
       font-weight: 700;
       letter-spacing: -0.03em;
+      line-height: 1.1;
     }
-
-    .kpi .sub {
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
-
-    .legend {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-bottom: 0.75rem;
-      font-size: 0.88rem;
-    }
-
-    .swatch {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .swatch i {
-      width: 0.7rem;
-      height: 0.7rem;
-      border-radius: 3px;
-      display: inline-block;
-    }
-
+    .kpi .sub { font-size: 0.82rem; color: var(--muted); }
+    .hero-result .value { font-size: clamp(1.8rem, 4vw, 2.35rem); }
+    .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.7rem; font-size: 0.88rem; }
+    .swatch { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .swatch i { width: 0.7rem; height: 0.7rem; border-radius: 3px; display: inline-block; }
     .swatch.off i { background: var(--off); }
     .swatch.on i { background: var(--on); }
-
-    .chart-box {
-      position: relative;
-      height: 280px;
-    }
-
-    .chart-box.tall { height: 340px; }
-
-    figure.shot {
-      margin: 0;
-    }
-
+    .chart-box { position: relative; height: 250px; }
+    .chart-box.sm { height: 210px; }
+    figure.shot { margin: 0; }
     figure.shot img {
       width: 100%;
       display: block;
@@ -213,73 +127,49 @@
       border: 1px solid var(--line);
       background: #0b1218;
     }
-
     figure.shot figcaption {
-      margin-top: 0.65rem;
+      margin-top: 0.6rem;
       color: var(--muted);
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       line-height: 1.45;
     }
-
-    table.compare {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-
-    table.compare th,
-    table.compare td {
+    table.compare { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    table.compare th, table.compare td {
       text-align: left;
-      padding: 0.65rem 0.5rem;
+      padding: 0.6rem 0.45rem;
       border-bottom: 1px solid var(--line);
       vertical-align: top;
     }
-
     table.compare th {
       font-family: "IBM Plex Mono", monospace;
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--muted);
       font-weight: 500;
     }
-
     table.compare td.num {
       font-family: "IBM Plex Mono", monospace;
       font-variant-numeric: tabular-nums;
     }
-
-    .takeaways {
-      display: grid;
-      gap: 0.75rem;
-    }
-
-    .takeaways li {
-      margin: 0;
-      padding-left: 0.2rem;
-      color: var(--ink);
-      line-height: 1.45;
-    }
-
+    ul.clean { margin: 0; padding-left: 1.1rem; }
+    ul.clean li { margin: 0.35rem 0; color: var(--ink); }
+    ul.clean li span { color: var(--muted); }
+    .links { display: flex; flex-wrap: wrap; gap: 0.65rem 1.1rem; margin-top: 0.75rem; }
+    .links a { color: var(--accent); text-decoration: none; font-size: 0.92rem; }
+    .links a:hover { text-decoration: underline; }
     footer {
       margin-top: 2.5rem;
       padding-top: 1rem;
       border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       display: flex;
       flex-wrap: wrap;
       gap: 0.75rem 1.25rem;
       justify-content: space-between;
     }
-
-    footer a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    footer a:hover { text-decoration: underline; }
-
+    footer a { color: var(--accent); text-decoration: none; }
     .error {
       padding: 1rem;
       border-radius: 12px;
@@ -287,31 +177,30 @@
       color: #7a2e12;
       border: 1px solid #f0b39a;
     }
+    .one-liner {
+      margin: 0.85rem 0 0;
+      padding: 0.85rem 1rem;
+      border-left: 3px solid var(--on);
+      background: rgba(255,255,255,0.55);
+      border-radius: 0 12px 12px 0;
+      color: var(--ink);
+      font-size: 0.98rem;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header class="hero">
-      <div class="eyebrow">LLM Inference Runtime Lab · Phase 6</div>
-      <h1 id="title">Prefix cache ON vs OFF</h1>
-      <p class="lede" id="lede">
-        Nsight Systems summaries from a warm A/B on vLLM — what the GPU did when automatic prefix caching was enabled vs disabled.
-      </p>
-      <div class="meta-row" id="meta-row"></div>
-      <p class="caveat" id="caveat"></p>
+    <header>
+      <p class="eyebrow">LLM Inference Runtime Lab</p>
+      <h1 id="title">Profiling vLLM Automatic Prefix Caching</h1>
+      <p class="lede" id="subtitle"></p>
+      <div class="meta-row" id="chips"></div>
     </header>
-
-    <div id="app">
-      <p class="lede">Loading dashboard data…</p>
-    </div>
-
+    <div id="app"><p class="lede">Loading…</p></div>
     <footer>
-      <span>Static dashboard · data from <code>nsys stats</code> CSVs</span>
-      <span>
-        <a href="https://github.com/sudhersankv/gpu-programming">gpu-programming</a>
-        ·
-        <a href="https://github.com/sudhersankv/gpu-programming/tree/main/llm-inference-runtime-lab">lab folder</a>
-      </span>
+      <span>Static case study · client timings + Nsight Systems</span>
+      <span id="footer-links"></span>
     </footer>
   </div>
 
@@ -355,237 +244,222 @@
     }
 
     function render(data) {
-      document.getElementById("title").textContent = data.meta.title;
-      document.getElementById("caveat").textContent = data.meta.caveat;
-      document.getElementById("meta-row").innerHTML = [
-        data.meta.model,
-        data.meta.gpu,
-        data.meta.protocol,
-      ].map((t) => `<span class="chip">${t}</span>`).join("");
-
-      const off = data.cache_off;
-      const on = data.cache_on;
-      const sql = data.sqlite;
-      if (!sql?.cache_off || !sql?.cache_on) {
+      const meta = data.meta;
+      const client = data.client;
+      if (!client?.request_2) {
         document.getElementById("app").innerHTML =
-          `<div class="error">data.json is missing the <code>sqlite</code> section. Run <code>python scripts/query_nsys_sqlite.py</code> locally (needs .sqlite next to the .nsys-rep files).</div>`;
+          `<div class="error">Missing client warm A/B metrics in data.json. Rebuild with build_apc_dashboard_data.py.</div>`;
         return;
       }
-      const sOff = sql.cache_off;
-      const sOn = sql.cache_on;
-      const htodOff = memByOp(off, "Host-to-Device");
-      const htodOn = memByOp(on, "Host-to-Device");
-      const kernOff = sOff.kernels_late_30s.total_time_ms;
-      const kernOn = sOn.kernels_late_30s.total_time_ms;
-      const ratio = kernOff / kernOn;
+
+      document.getElementById("title").textContent = meta.title;
+      document.getElementById("subtitle").textContent = meta.subtitle;
+      document.getElementById("chips").innerHTML = (meta.chips || [])
+        .map((t) => `<span class="chip">${t}</span>`).join("");
+      document.getElementById("footer-links").innerHTML =
+        `<a href="${meta.repo_url}">repository</a> · <a href="${meta.lab_readme_url}">lab README</a>`;
+
+      const r2 = client.request_2;
+      const r1 = client.request_1_match;
+      const on = data.cache_on;
+      const off = data.cache_off;
+      const sql = data.sqlite;
+      const findings = data.nsight_findings || { bullets: [], kernels: [] };
 
       const app = document.getElementById("app");
       app.innerHTML = `
         <section>
-          <h2>Where APC shows up (SQLite · last 30s of trace)</h2>
+          <h2>Main result</h2>
           <div class="grid grid-4">
-            <div class="panel kpi">
-              <span class="label">GPU kernel time · OFF</span>
-              <span class="value" style="color:${OFF}">${fmt(kernOff / 1000, 2)}s</span>
-              <span class="sub">${fmt(sOff.kernels_late_30s.count)} launches</span>
+            <div class="panel kpi hero-result">
+              <span class="label">Request 2 TTFT · cache OFF</span>
+              <span class="value" style="color:${OFF}">${fmt(r2.off_ttft_ms, 1)} ms</span>
+              <span class="sub">Time to first token</span>
             </div>
-            <div class="panel kpi">
-              <span class="label">GPU kernel time · ON</span>
-              <span class="value" style="color:${ON}">${fmt(kernOn / 1000, 2)}s</span>
-              <span class="sub">${fmt(sOn.kernels_late_30s.count)} launches</span>
+            <div class="panel kpi hero-result">
+              <span class="label">Request 2 TTFT · cache ON</span>
+              <span class="value" style="color:${ON}">${fmt(r2.on_ttft_ms, 1)} ms</span>
+              <span class="sub">Same prompts &amp; hardware</span>
             </div>
-            <div class="panel kpi">
-              <span class="label">OFF / ON kernel time</span>
-              <span class="value">${fmt(ratio, 2)}×</span>
-              <span class="sub">Cache OFF recomputes more prefill work</span>
+            <div class="panel kpi hero-result">
+              <span class="label">Speedup</span>
+              <span class="value">${fmt(r2.ttft_speedup, 1)}×</span>
+              <span class="sub">${fmt(r2.ttft_saved_ms, 1)} ms saved</span>
             </div>
-            <div class="panel kpi">
-              <span class="label">ampere GEMM · last 30s</span>
-              <span class="value">${fmt(sOff.kernels_late_30s.signals.gemm_ampere.total_time_ms / 1000, 2)}s / ${fmt(sOn.kernels_late_30s.signals.gemm_ampere.total_time_ms / 1000, 2)}s</span>
-              <span class="sub">OFF vs ON</span>
+            <div class="panel kpi hero-result">
+              <span class="label">TTFT reduction</span>
+              <span class="value">${fmt(r2.ttft_reduction_pct, 1)}%</span>
+              <span class="sub">vs cache OFF Request 2</span>
             </div>
           </div>
-          <div class="panel" style="margin-top:1.1rem">
+          <p class="one-liner">
+            After Request 1 populated the KV cache, Request 2 reused the shared paper prefix
+            instead of recomputing its full prefill.
+          </p>
+          <div class="panel" style="margin-top:1rem">
             <div class="legend">
               <span class="swatch off"><i></i> Cache OFF</span>
               <span class="swatch on"><i></i> Cache ON</span>
             </div>
-            <div class="chart-box"><canvas id="lateKernChart"></canvas></div>
-            <p class="note">${sOff.sqlite_window.note} Queried from <code>CUPTI_ACTIVITY_KIND_KERNEL</code>.</p>
+            <div class="chart-box sm"><canvas id="r2Chart"></canvas></div>
+            <p class="note">Primary metric: client-measured TTFT on the second shared-prefix request.</p>
           </div>
         </section>
 
         <section>
-          <h2>HtoD split: tiny metadata vs large weight uploads</h2>
-          <div class="legend">
-            <span class="swatch off"><i></i> Cache OFF</span>
-            <span class="swatch on"><i></i> Cache ON</span>
-          </div>
-          <div class="grid grid-2">
-            <div class="panel">
-              <div class="chart-box"><canvas id="htodSplitCount"></canvas></div>
-              <p class="note">Session totals: large (≥1&nbsp;MB) copies are the ~3&nbsp;GB model load — same on both. Tiny (&lt;4&nbsp;KB) counts are also similar; APC is not “fewer memcpys overall.”</p>
-            </div>
-            <div class="panel">
-              <div class="chart-box"><canvas id="htodSplitTime"></canvas></div>
-              <p class="note">Almost all HtoD <em>time</em> is large uploads. Tiny copies are sub‑millisecond in aggregate — visible on the Events timeline, not in session time bars.</p>
-            </div>
-          </div>
-          <div class="panel" style="margin-top:1.1rem">
-            <table class="compare">
+          <h2>Controlled experiment</h2>
+          <div class="panel">
+            <ul class="clean">
+              <li>An <strong>unrelated</strong> short request warmed CUDA / runtime paths without seeding the Qasper paper into the prefix cache.</li>
+              <li><strong>Request 1</strong> used the shared paper + question A — a cache miss in both runs.</li>
+              <li><strong>Request 2</strong> reused the same paper with a different question — hit when caching is on, full re-prefill when off.</li>
+              <li>Both arms used the same model, prompts, generation length, GPU, and benchmark harness.</li>
+            </ul>
+            <table class="compare" style="margin-top:0.85rem">
               <thead>
-                <tr><th>Metric (from SQLite)</th><th>OFF</th><th>ON</th></tr>
+                <tr><th>Request 1 TTFT (miss)</th><th>Cache OFF</th><th>Cache ON</th></tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>Session HtoD all</td>
-                  <td class="num">${fmt(sOff.htod_session.all_htod.count)} · ${fmt(sOff.htod_session.all_htod.total_mb, 1)} MB</td>
-                  <td class="num">${fmt(sOn.htod_session.all_htod.count)} · ${fmt(sOn.htod_session.all_htod.total_mb, 1)} MB</td>
+                  <td>Matched warm miss</td>
+                  <td class="num">${fmt(r1.off_ttft_ms, 1)} ms</td>
+                  <td class="num">${fmt(r1.on_ttft_ms, 1)} ms</td>
                 </tr>
                 <tr>
-                  <td>Session HtoD ≥1&nbsp;MB (weights)</td>
-                  <td class="num">${fmt(sOff.htod_session.large_ge_1mb.count)} · ${fmt(sOff.htod_session.large_ge_1mb.total_mb, 1)} MB</td>
-                  <td class="num">${fmt(sOn.htod_session.large_ge_1mb.count)} · ${fmt(sOn.htod_session.large_ge_1mb.total_mb, 1)} MB</td>
+                  <td>Request 2 TTFT</td>
+                  <td class="num">${fmt(client.cache_off.request_2.ttft_ms, 1)} ms</td>
+                  <td class="num">${fmt(client.cache_on.request_2.ttft_ms, 1)} ms</td>
                 </tr>
                 <tr>
-                  <td>Session HtoD &lt;4&nbsp;KB (tiny)</td>
-                  <td class="num">${fmt(sOff.htod_session.tiny_lt_4kb.count)} · ${fmt(sOff.htod_session.tiny_lt_4kb.total_mb, 3)} MB</td>
-                  <td class="num">${fmt(sOn.htod_session.tiny_lt_4kb.count)} · ${fmt(sOn.htod_session.tiny_lt_4kb.total_mb, 3)} MB</td>
+                  <td>Request 2 E2E</td>
+                  <td class="num">${fmt(client.cache_off.request_2.e2e_s, 3)} s</td>
+                  <td class="num">${fmt(client.cache_on.request_2.e2e_s, 3)} s</td>
                 </tr>
                 <tr>
-                  <td>Last 30s flash_fwd time</td>
-                  <td class="num">${fmt(sOff.kernels_late_30s.signals.flash_fwd.total_time_ms, 1)} ms · n=${fmt(sOff.kernels_late_30s.signals.flash_fwd.instances)}</td>
-                  <td class="num">${fmt(sOn.kernels_late_30s.signals.flash_fwd.total_time_ms, 1)} ms · n=${fmt(sOn.kernels_late_30s.signals.flash_fwd.instances)}</td>
-                </tr>
-                <tr>
-                  <td>Last 30s reshape_and_cache</td>
-                  <td class="num">${fmt(sOff.kernels_late_30s.signals.reshape_and_cache.instances)} · ${fmt(sOff.kernels_late_30s.signals.reshape_and_cache.total_time_ms, 2)} ms</td>
-                  <td class="num">${fmt(sOn.kernels_late_30s.signals.reshape_and_cache.instances)} · ${fmt(sOn.kernels_late_30s.signals.reshape_and_cache.total_time_ms, 2)} ms</td>
+                  <td>Request 2 output tok/s</td>
+                  <td class="num">${fmt(client.cache_off.request_2.output_tok_per_s, 1)}</td>
+                  <td class="num">${fmt(client.cache_on.request_2.output_tok_per_s, 1)}</td>
                 </tr>
               </tbody>
             </table>
+            <p class="note">
+              Request 1 TTFTs differ by only ${fmt(r1.abs_delta_ms, 1)} ms, so the Request 2 gap is explained by
+              prefix reuse — not cold startup.
+            </p>
           </div>
         </section>
 
         <section>
-          <h2>Client TTFT (prefix hit illustration)</h2>
-          <div class="panel">
-            <div class="chart-box" style="height:220px"><canvas id="ttftChart"></canvas></div>
-            <p class="note">${data.client_ttft.note} Source: ${data.client_ttft.source}</p>
-          </div>
-        </section>
-
-        <section>
-          <h2>Whole-session nsys stats (why the old chart looked “wrong”)</h2>
-          <div class="legend">
-            <span class="swatch off"><i></i> Cache OFF</span>
-            <span class="swatch on"><i></i> Cache ON</span>
-          </div>
+          <h2>Nsight findings</h2>
           <div class="grid grid-2">
             <div class="panel">
-              <div class="chart-box"><canvas id="memCountChart"></canvas></div>
-              <p class="note">Identical HtoD counts (${fmt(htodOff.count)}) are correct for the full capture — not a bad export.</p>
+              <ul class="clean">
+                ${findings.bullets.map((b) => `<li>${b}</li>`).join("")}
+              </ul>
             </div>
             <div class="panel">
-              <div class="chart-box"><canvas id="apiChart"></canvas></div>
-              <p class="note">CPU-side CUDA API time also dominated by load / sync, not Q2.</p>
+              <p style="margin:0 0 0.45rem;color:var(--ink)"><strong>Representative kernels in the traces</strong></p>
+              <ul class="clean">
+                ${findings.kernels.map((k) => `<li>${k}</li>`).join("")}
+              </ul>
             </div>
           </div>
-        </section>
-
-        <section>
-          <h2>Timeline around measured requests</h2>
-          <div class="grid grid-2">
+          <div class="grid grid-2" style="margin-top:1rem">
             <figure class="panel shot">
-              <img src="assets/warm_overview.png" alt="Zoomed-out Nsight: cache off vs cache on" />
-              <figcaption><strong>Zoomed out</strong> — left OFF, right ON. Broad shape looks similar after long init.</figcaption>
+              <img src="assets/warm_overview.png" alt="Nsight timelines cache off vs on" />
+              <figcaption>Full capture shape is similar after init; measured work is in the later request bursts.</figcaption>
             </figure>
             <figure class="panel shot">
-              <img src="assets/warm_events.png" alt="Events view: tiny HtoD burst when cache on" />
-              <figcaption><strong>Events</strong> — OFF is mostly kernels; ON shows a burst of tiny Host→Device copies before transformer kernels (metadata-sized, not bulk KV restore).</figcaption>
+              <img src="assets/warm_events.png" alt="Nsight Events view around requests" />
+              <figcaption>Events detail: cache ON shows small H→D activity before kernels on a hit; cache OFF spends more time in prefill kernels.</figcaption>
             </figure>
           </div>
         </section>
 
         <section>
-          <h2>Takeaways</h2>
+          <h2>Quantitative profiler data</h2>
+          ${sql ? `
+          <div class="panel" style="margin-bottom:1rem">
+            <p style="margin:0;color:var(--ink)"><strong>Late-trace GPU activity comparison</strong></p>
+            <p class="note" style="margin-top:0.4rem">
+              Filter: last ${sql.cache_off.sqlite_window.window_s}s of each capture
+              (<code>CUPTI_ACTIVITY_KIND_KERNEL</code>). This window excludes model loading but may include
+              more than Request 2; <strong>benchmark TTFT remains the primary request-level latency measurement</strong>.
+            </p>
+            <div class="legend" style="margin-top:0.75rem">
+              <span class="swatch off"><i></i> Cache OFF</span>
+              <span class="swatch on"><i></i> Cache ON</span>
+            </div>
+            <div class="chart-box"><canvas id="lateKernChart"></canvas></div>
+            <p class="note">
+              Late-trace kernel time OFF ${fmt(sql.cache_off.kernels_late_30s.total_time_ms / 1000, 2)}s vs
+              ON ${fmt(sql.cache_on.kernels_late_30s.total_time_ms / 1000, 2)}s — consistent with more prefill
+              compute when the prefix is not reused.
+            </p>
+          </div>
+          <div class="grid grid-2">
+            <div class="panel">
+              <p style="margin:0 0 0.35rem;color:var(--ink)"><strong>Host→Device by size (whole session)</strong></p>
+              <div class="chart-box sm"><canvas id="htodSplitCount"></canvas></div>
+              <p class="note">Large (≥1&nbsp;MB) copies are weight upload (~3&nbsp;GB) and match across arms. Tiny copies do not explain the TTFT win.</p>
+            </div>
+            <div class="panel">
+              <table class="compare">
+                <thead><tr><th>Whole-session HtoD</th><th>OFF</th><th>ON</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td>All HtoD</td>
+                    <td class="num">${fmt(sql.cache_off.htod_session.all_htod.count)} · ${fmt(sql.cache_off.htod_session.all_htod.total_mb, 0)} MB</td>
+                    <td class="num">${fmt(sql.cache_on.htod_session.all_htod.count)} · ${fmt(sql.cache_on.htod_session.all_htod.total_mb, 0)} MB</td>
+                  </tr>
+                  <tr>
+                    <td>≥1&nbsp;MB</td>
+                    <td class="num">${fmt(sql.cache_off.htod_session.large_ge_1mb.count)}</td>
+                    <td class="num">${fmt(sql.cache_on.htod_session.large_ge_1mb.count)}</td>
+                  </tr>
+                  <tr>
+                    <td>&lt;4&nbsp;KB</td>
+                    <td class="num">${fmt(sql.cache_off.htod_session.tiny_lt_4kb.count)}</td>
+                    <td class="num">${fmt(sql.cache_on.htod_session.tiny_lt_4kb.count)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="note">Whole-session CUDA API / kernel totals are dominated by load and compilation — use them as context, not as the Request 2 result.</p>
+            </div>
+          </div>
+          ` : `<div class="panel"><p class="note">SQLite-filtered profiler metrics not present. Run query_nsys_sqlite.py locally to refresh.</p></div>`}
+        </section>
+
+        <section>
+          <h2>Engineering work demonstrated</h2>
           <div class="panel">
-            <ul class="takeaways">
-              <li>In the <strong>last 30s</strong> of each trace (after weight upload), cache OFF spends <strong>${fmt(ratio, 2)}×</strong> more GPU kernel time than cache ON — mostly GEMM / attention prefill.</li>
-              <li>Prefix-cache hits do <strong>not</strong> H→D restore shared KV; that KV stays in GPU HBM. Session HtoD totals stay ~identical (~${fmt(htodOff.total_mb, 0)} MB).</li>
-              <li>Tiny HtoD copies exist on both runs; the GUI “burst before kernels” is a timing pattern on a hit, while the quantitative win is <strong>less compute</strong>, not fewer session memcpys.</li>
-              <li>Client TTFT still drops on the second shared-prefix question when APC is on.</li>
+            <ul class="clean">
+              <li>Deterministic shared-prefix workload generation (Qasper)</li>
+              <li>Repeatable TTFT / E2E / throughput benchmark harness</li>
+              <li>Containerized vLLM serving</li>
+              <li>Automatic cache ON/OFF experiment orchestration</li>
+              <li>Nsight Systems capture and timeline analysis</li>
+              <li><code>nsys stats</code> CSV export</li>
+              <li>Direct SQLite / CUPTI analysis</li>
+              <li>Static GitHub Pages visualization</li>
             </ul>
+            <div class="links">
+              <a href="${meta.repo_url}">Repository</a>
+              <a href="${meta.lab_readme_url}">Lab README</a>
+              <a href="${meta.harness_url}">Profiling harness</a>
+              <a href="${meta.scripts_url}">Dashboard data scripts</a>
+            </div>
           </div>
         </section>
       `;
 
-      // Late-window kernel signals (SQLite)
-      const sigKeys = [
-        ["gemm_ampere", "ampere GEMM"],
-        ["flash_fwd", "flash_fwd"],
-        ["reshape_and_cache", "reshape_and_cache"],
-        ["triton_silu", "triton silu"],
-      ];
-      new Chart(document.getElementById("lateKernChart"), {
+      new Chart(document.getElementById("r2Chart"), {
         type: "bar",
         data: {
-          labels: sigKeys.map(([, label]) => label),
+          labels: ["Request 2 TTFT (ms)"],
           datasets: [
-            {
-              label: "OFF ms",
-              data: sigKeys.map(([k]) => sOff.kernels_late_30s.signals[k].total_time_ms),
-              backgroundColor: OFF,
-              borderRadius: 6,
-            },
-            {
-              label: "ON ms",
-              data: sigKeys.map(([k]) => sOn.kernels_late_30s.signals[k].total_time_ms),
-              backgroundColor: ON,
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          ...chartDefaults,
-          plugins: {
-            ...chartDefaults.plugins,
-            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
-          },
-          scales: {
-            ...chartDefaults.scales,
-            y: {
-              ...chartDefaults.scales.y,
-              title: { display: true, text: "GPU time in last 30s (ms)", color: MUTED, font: { family: "Outfit" } },
-            },
-          },
-        },
-      });
-
-      // Tiny vs large HtoD counts
-      new Chart(document.getElementById("htodSplitCount"), {
-        type: "bar",
-        data: {
-          labels: ["Tiny <4KB", "Large ≥1MB"],
-          datasets: [
-            {
-              label: "OFF",
-              data: [
-                sOff.htod_session.tiny_lt_4kb.count,
-                sOff.htod_session.large_ge_1mb.count,
-              ],
-              backgroundColor: OFF,
-              borderRadius: 6,
-            },
-            {
-              label: "ON",
-              data: [
-                sOn.htod_session.tiny_lt_4kb.count,
-                sOn.htod_session.large_ge_1mb.count,
-              ],
-              backgroundColor: ON,
-              borderRadius: 6,
-            },
+            { label: "Cache OFF", data: [r2.off_ttft_ms], backgroundColor: OFF, borderRadius: 8, maxBarThickness: 72 },
+            { label: "Cache ON", data: [r2.on_ttft_ms], backgroundColor: ON, borderRadius: 8, maxBarThickness: 72 },
           ],
         },
         options: {
@@ -597,134 +471,82 @@
         },
       });
 
-      new Chart(document.getElementById("htodSplitTime"), {
-        type: "bar",
-        data: {
-          labels: ["Tiny <4KB (ms)", "Large ≥1MB (s)"],
-          datasets: [
-            {
-              label: "OFF",
-              data: [
-                sOff.htod_session.tiny_lt_4kb.total_time_ms,
-                sOff.htod_session.large_ge_1mb.total_time_ms / 1000,
-              ],
-              backgroundColor: OFF,
-              borderRadius: 6,
-            },
-            {
-              label: "ON",
-              data: [
-                sOn.htod_session.tiny_lt_4kb.total_time_ms,
-                sOn.htod_session.large_ge_1mb.total_time_ms / 1000,
-              ],
-              backgroundColor: ON,
-              borderRadius: 6,
-            },
-          ],
-        },
-        options: {
-          ...chartDefaults,
-          plugins: {
-            ...chartDefaults.plugins,
-            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
+      if (sql) {
+        const sigKeys = [
+          ["gemm_ampere", "ampere GEMM"],
+          ["flash_fwd", "flash_fwd"],
+          ["reshape_and_cache", "reshape_and_cache"],
+          ["triton_silu", "triton silu"],
+        ];
+        new Chart(document.getElementById("lateKernChart"), {
+          type: "bar",
+          data: {
+            labels: sigKeys.map(([, label]) => label),
+            datasets: [
+              {
+                label: "OFF ms",
+                data: sigKeys.map(([k]) => sql.cache_off.kernels_late_30s.signals[k].total_time_ms),
+                backgroundColor: OFF,
+                borderRadius: 6,
+              },
+              {
+                label: "ON ms",
+                data: sigKeys.map(([k]) => sql.cache_on.kernels_late_30s.signals[k].total_time_ms),
+                backgroundColor: ON,
+                borderRadius: 6,
+              },
+            ],
           },
-        },
-      });
+          options: {
+            ...chartDefaults,
+            plugins: {
+              ...chartDefaults.plugins,
+              legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
+            },
+            scales: {
+              ...chartDefaults.scales,
+              y: {
+                ...chartDefaults.scales.y,
+                title: { display: true, text: "GPU time (ms), last 30s of trace", color: MUTED, font: { family: "Outfit" } },
+              },
+            },
+          },
+        });
 
-      // TTFT
-      new Chart(document.getElementById("ttftChart"), {
-        type: "bar",
-        data: {
-          labels: data.client_ttft.series.map((s) => s.label),
-          datasets: [{
-            data: data.client_ttft.series.map((s) => s.ttft_s),
-            backgroundColor: [OFF, ON],
-            borderRadius: 8,
-            maxBarThickness: 72,
-          }],
-        },
-        options: {
-          ...chartDefaults,
-          plugins: { ...chartDefaults.plugins, legend: { display: false } },
-          scales: {
-            ...chartDefaults.scales,
-            y: {
-              ...chartDefaults.scales.y,
-              title: { display: true, text: "TTFT (s)", color: MUTED, font: { family: "Outfit" } },
+        new Chart(document.getElementById("htodSplitCount"), {
+          type: "bar",
+          data: {
+            labels: ["Tiny <4KB", "Large ≥1MB"],
+            datasets: [
+              {
+                label: "OFF",
+                data: [
+                  sql.cache_off.htod_session.tiny_lt_4kb.count,
+                  sql.cache_off.htod_session.large_ge_1mb.count,
+                ],
+                backgroundColor: OFF,
+                borderRadius: 6,
+              },
+              {
+                label: "ON",
+                data: [
+                  sql.cache_on.htod_session.tiny_lt_4kb.count,
+                  sql.cache_on.htod_session.large_ge_1mb.count,
+                ],
+                backgroundColor: ON,
+                borderRadius: 6,
+              },
+            ],
+          },
+          options: {
+            ...chartDefaults,
+            plugins: {
+              ...chartDefaults.plugins,
+              legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
             },
           },
-        },
-      });
-
-      const memLabels = ["HtoD", "DtoH", "DtoD", "memset"];
-      const pick = (side, key) => {
-        const map = {
-          HtoD: memByOp(side, "Host-to-Device"),
-          DtoH: memByOp(side, "Device-to-Host"),
-          DtoD: memByOp(side, "Device-to-Device"),
-          memset: memByOp(side, "memset"),
-        };
-        return map[key];
-      };
-
-      new Chart(document.getElementById("memCountChart"), {
-        type: "bar",
-        data: {
-          labels: memLabels,
-          datasets: [
-            { label: "OFF", data: memLabels.map((k) => pick(off, k).count), backgroundColor: OFF, borderRadius: 6 },
-            { label: "ON", data: memLabels.map((k) => pick(on, k).count), backgroundColor: ON, borderRadius: 6 },
-          ],
-        },
-        options: {
-          ...chartDefaults,
-          plugins: {
-            ...chartDefaults.plugins,
-            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
-          },
-        },
-      });
-
-      const apiLabels = off.api.slice(0, 6).map((a) => a.name);
-      const onApi = Object.fromEntries(on.api.map((a) => [a.name, a]));
-      new Chart(document.getElementById("apiChart"), {
-        type: "bar",
-        data: {
-          labels: apiLabels,
-          datasets: [
-            {
-              label: "OFF",
-              data: off.api.slice(0, 6).map((a) => a.total_time_ms / 1000),
-              backgroundColor: OFF,
-              borderRadius: 4,
-            },
-            {
-              label: "ON",
-              data: apiLabels.map((n) => (onApi[n]?.total_time_ms ?? 0) / 1000),
-              backgroundColor: ON,
-              borderRadius: 4,
-            },
-          ],
-        },
-        options: {
-          indexAxis: "y",
-          ...chartDefaults,
-          plugins: {
-            ...chartDefaults.plugins,
-            legend: { display: true, labels: { font: { family: "Outfit" }, color: MUTED } },
-          },
-          scales: {
-            x: {
-              ...chartDefaults.scales.x,
-              title: { display: true, text: "CPU API time (s)", color: MUTED, font: { family: "Outfit" } },
-            },
-            y: {
-              ticks: { color: MUTED, font: { family: "IBM Plex Mono", size: 10 } },
-              grid: { display: false },
-            },
-          },
-        },
-      });
+        });
+      }
     }
 
     fetch("./data.json")
@@ -735,7 +557,7 @@
       .then(render)
       .catch((err) => {
         document.getElementById("app").innerHTML =
-          `<div class="error">Failed to load dashboard data: ${err.message}. Open this page via a local server or GitHub Pages (file:// cannot fetch JSON).</div>`;
+          `<div class="error">Failed to load dashboard data: ${err.message}</div>`;
       });
   </script>
 </body>

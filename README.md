@@ -32,7 +32,7 @@ gpu-programming/
 └── scripts/              # Windows build + env helpers
 ```
 
-**Live dashboard:** [APC · Nsight cache ON vs OFF](https://sudhersankv.github.io/gpu-programming/)  
+**Live dashboard:** [Profiling vLLM Automatic Prefix Caching](https://sudhersankv.github.io/gpu-programming/)  
 (Enable Pages: Settings → Pages → Deploy from branch → `/docs`.)
 
 ## Setup (CUDA track)

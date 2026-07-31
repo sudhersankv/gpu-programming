@@ -1,22 +1,23 @@
 # APC Nsight dashboard (GitHub Pages)
 
-Static site for the LLM Inference Runtime Lab Phase 6 A/B:
+Recruiter-facing case study for the LLM Inference Runtime Lab warm cache ON/OFF experiment.
 
-- `index.html` — comparison UI
-- `data.json` — from `nsys stats` CSVs **and** filtered SQLite queries
-- `assets/` — warm ON/OFF timeline screenshots
+- `index.html` — static UI (reads `data.json` only; no hard-coded TTFT math)
+- `data.json` — built from bench + nsys CSV + optional SQLite filters
+- `assets/` — Nsight timeline screenshots
 
-**URL (after Pages is enabled):** https://sudhersankv.github.io/gpu-programming/
+**URL:** https://sudhersankv.github.io/gpu-programming/
 
-Rebuild from the lab folder (needs local `.nsys-rep` / `.sqlite` under `profiling/reports/`):
+## Reproduce
 
 ```powershell
 cd llm-inference-runtime-lab
-python scripts\export_nsys_stats.py
-python scripts\build_apc_dashboard_data.py
-python scripts\query_nsys_sqlite.py
+python scripts\export_nsys_stats.py          # needs local .nsys-rep
+python scripts\build_apc_dashboard_data.py   # reads profiling/bench/warm_cache_ab.json
+python scripts\query_nsys_sqlite.py          # needs local .sqlite; merges late-trace metrics
 ```
 
-Raw `.sqlite` files stay gitignored; only the small summarized `data.json` is published.
+Client timings live in `llm-inference-runtime-lab/profiling/bench/warm_cache_ab.json`.  
+Speedup / reduction are **computed** in `build_apc_dashboard_data.py`.
 
 Repo **Settings → Pages → Deploy from branch `main` → folder `/docs`**.

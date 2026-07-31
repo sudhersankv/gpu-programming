@@ -1,0 +1,38 @@
+{
+  "experiment_id": "warm_cache_ab_qasper_shared",
+  "description": "Matched warm A/B: unrelated warmup, then two Qasper prompts sharing a 1024-token paper prefix.",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "engine": "vLLM",
+  "gpu": "NVIDIA RTX 4060 Laptop (~8 GB)",
+  "workload": "Qasper shared-prefix (1024-token paper)",
+  "protocol": [
+    "unrelated_short_warmup",
+    "shared_prefix_request_1",
+    "shared_prefix_request_2"
+  ],
+  "source": "Client timings from profile_prefix_cache.py warm runs (cache_on_warm / cache_off_warm); pasted from harness terminal output and committed as the experiment record.",
+  "cache_on": {
+    "request_1": {
+      "ttft_s": 0.7302,
+      "e2e_s": 1.9538,
+      "output_tok_per_s": 52.3
+    },
+    "request_2": {
+      "ttft_s": 0.0565,
+      "e2e_s": 0.8389,
+      "output_tok_per_s": 51.1
+    }
+  },
+  "cache_off": {
+    "request_1": {
+      "ttft_s": 0.7166,
+      "e2e_s": 1.992,
+      "output_tok_per_s": 50.2
+    },
+    "request_2": {
+      "ttft_s": 0.3958,
+      "e2e_s": 1.1531,
+      "output_tok_per_s": 52.8
+    }
+  }
+}

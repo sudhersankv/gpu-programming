@@ -1,7 +1,13 @@
-"""Build profiling/dashboard/data.json from nsys stats CSVs.
+"""Build docs/data.json for the APC GitHub Pages dashboard.
+
+Merges:
+  - profiling/bench/warm_cache_ab.json  (client TTFT / E2E / tok/s)
+  - profiling/stats/*_warm_*.csv       (whole-session nsys stats)
+  - docs/data.json sqlite section       (optional; refreshed by query_nsys_sqlite.py)
 
 Usage (from llm-inference-runtime-lab/):
   python scripts/build_apc_dashboard_data.py
+  python scripts/query_nsys_sqlite.py   # refreshes sqlite:* from local .sqlite
 """
 
 from __future__ import annotations
@@ -14,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 STATS = ROOT / "profiling" / "stats"
-# GitHub Pages serves /docs from the repo root.
+BENCH = ROOT / "profiling" / "bench" / "warm_cache_ab.json"
 OUT = REPO / "docs" / "data.json"
 
 
@@ -104,9 +110,10 @@ def find_kernel(stem: str, substr: str) -> dict | None:
     return None
 
 
-def pack(stem: str) -> dict:
+def pack_nsys(stem: str) -> dict:
     return {
         "stem": stem,
+        "scope": "whole_session",
         "mem": mem_ops(stem),
         "kernels": top_kernels(stem),
         "api": top_api(stem),
@@ -117,7 +124,72 @@ def pack(stem: str) -> dict:
     }
 
 
+def derive_client(bench: dict) -> dict:
+    """Compute request-level deltas from raw warm A/B timings (seconds)."""
+    on = bench["cache_on"]
+    off = bench["cache_off"]
+    on_r1 = on["request_1"]["ttft_s"]
+    on_r2 = on["request_2"]["ttft_s"]
+    off_r1 = off["request_1"]["ttft_s"]
+    off_r2 = off["request_2"]["ttft_s"]
+
+    saved_s = off_r2 - on_r2
+    if off_r2 <= 0 or on_r2 <= 0:
+        raise ValueError("TTFT values must be positive")
+    reduction_pct = 100.0 * saved_s / off_r2
+    speedup = off_r2 / on_r2
+
+    return {
+        "source": bench.get("source", ""),
+        "experiment_id": bench.get("experiment_id", ""),
+        "cache_on": {
+            "request_1": {
+                "ttft_ms": round(on_r1 * 1000, 1),
+                "ttft_s": on_r1,
+                "e2e_s": on["request_1"]["e2e_s"],
+                "output_tok_per_s": on["request_1"]["output_tok_per_s"],
+            },
+            "request_2": {
+                "ttft_ms": round(on_r2 * 1000, 1),
+                "ttft_s": on_r2,
+                "e2e_s": on["request_2"]["e2e_s"],
+                "output_tok_per_s": on["request_2"]["output_tok_per_s"],
+            },
+        },
+        "cache_off": {
+            "request_1": {
+                "ttft_ms": round(off_r1 * 1000, 1),
+                "ttft_s": off_r1,
+                "e2e_s": off["request_1"]["e2e_s"],
+                "output_tok_per_s": off["request_1"]["output_tok_per_s"],
+            },
+            "request_2": {
+                "ttft_ms": round(off_r2 * 1000, 1),
+                "ttft_s": off_r2,
+                "e2e_s": off["request_2"]["e2e_s"],
+                "output_tok_per_s": off["request_2"]["output_tok_per_s"],
+            },
+        },
+        "request_2": {
+            "ttft_saved_ms": round(saved_s * 1000, 1),
+            "ttft_reduction_pct": round(reduction_pct, 1),
+            "ttft_speedup": round(speedup, 1),
+            "off_ttft_ms": round(off_r2 * 1000, 1),
+            "on_ttft_ms": round(on_r2 * 1000, 1),
+        },
+        "request_1_match": {
+            "on_ttft_ms": round(on_r1 * 1000, 1),
+            "off_ttft_ms": round(off_r1 * 1000, 1),
+            "abs_delta_ms": round(abs(on_r1 - off_r1) * 1000, 1),
+        },
+    }
+
+
 def main() -> int:
+    if not BENCH.is_file():
+        print(f"missing bench record: {BENCH}")
+        return 1
+
     for stem in ("cache_off_warm", "cache_on_warm"):
         needed = [
             f"{stem}_cuda_gpu_kern_sum.csv",
@@ -131,32 +203,91 @@ def main() -> int:
             print("Run: python scripts/export_nsys_stats.py")
             return 1
 
+    bench = json.loads(BENCH.read_text(encoding="utf-8"))
+    client = derive_client(bench)
+
+    # Preserve prior sqlite section if present (refreshed by query_nsys_sqlite.py).
+    prior_sqlite = None
+    if OUT.is_file():
+        try:
+            prior_sqlite = json.loads(OUT.read_text(encoding="utf-8")).get("sqlite")
+        except json.JSONDecodeError:
+            prior_sqlite = None
+
     data = {
         "meta": {
-            "title": "vLLM Automatic Prefix Cache — Nsight A/B",
-            "model": "Qwen/Qwen2.5-1.5B-Instruct",
-            "gpu": "NVIDIA RTX 4060 Laptop (~8 GB)",
-            "protocol": "Unrelated warmup → 2 shared-prefix Qasper prompts",
-            "caveat": (
-                "Whole-session nsys stats include model load + init + warmup + Q1 + Q2. "
-                "Session HtoD totals look alike; APC shows up in the Events timeline "
-                "(tiny H→D before kernels on a hit) and in client TTFT on Q2."
+            "title": "Profiling vLLM Automatic Prefix Caching",
+            "subtitle": (
+                "A controlled cache ON/OFF experiment measuring repeated-prefix "
+                "TTFT and tracing CPU/GPU execution with NVIDIA Nsight Systems."
             ),
-        },
-        "client_ttft": {
-            "source": "Phase 5 shared-prefix bench (cache ON); profile JSONL was not persisted",
-            "series": [
-                {"label": "Q1 (miss)", "ttft_s": 2.3},
-                {"label": "Q2 (hit)", "ttft_s": 0.04},
+            "model": bench["model"],
+            "gpu": bench["gpu"],
+            "engine": bench["engine"],
+            "workload": bench["workload"],
+            "protocol": "Unrelated warmup → shared-prefix Request 1 → shared-prefix Request 2",
+            "chips": [
+                bench["model"].removeprefix("Qwen/"),
+                "NVIDIA RTX 4060 Laptop GPU",
+                "vLLM",
+                "Qasper · 1024-token shared paper prefix",
+                "NVIDIA Nsight Systems",
             ],
-            "note": (
-                "Illustrates the prefix-hit TTFT drop with APC on. "
-                "Warm ON/OFF profile client timings were not saved to disk."
+            "repo_url": "https://github.com/sudhersankv/gpu-programming",
+            "lab_readme_url": (
+                "https://github.com/sudhersankv/gpu-programming/tree/main/"
+                "llm-inference-runtime-lab"
+            ),
+            "harness_url": (
+                "https://github.com/sudhersankv/gpu-programming/blob/main/"
+                "llm-inference-runtime-lab/scripts/profile_prefix_cache.py"
+            ),
+            "scripts_url": (
+                "https://github.com/sudhersankv/gpu-programming/tree/main/"
+                "llm-inference-runtime-lab/scripts"
             ),
         },
-        "cache_off": pack("cache_off_warm"),
-        "cache_on": pack("cache_on_warm"),
+        "client": client,
+        "nsight_findings": {
+            "bullets": [
+                "Cache OFF executed the full prefill transformer path for Request 2.",
+                "Cache ON reused GPU-resident KV blocks and computed only the uncached suffix.",
+                "Decode CUDA Graph execution remained similar in both runs.",
+                "Output-token throughput stayed approximately unchanged (~50–53 tok/s).",
+                (
+                    "Small Host→Device copies near request execution are consistent with "
+                    "input and runtime metadata transfers — not evidence that every copy "
+                    "is specifically a KV block-table update."
+                ),
+                (
+                    "Cached KV tensors were not restored Host→Device; reused KV remained "
+                    "resident in GPU memory."
+                ),
+            ],
+            "kernels": [
+                "Tensor Core BF16 GEMMs (ampere_bf16 / Cutlass)",
+                "FlashAttention forward (flash_fwd_splitkv)",
+                "vllm::reshape_and_cache_flash",
+                "Fused Triton SiLU and normalization kernels",
+                "CUDA Graph replay during decoding",
+            ],
+        },
+        "cache_off": pack_nsys("cache_off_warm"),
+        "cache_on": pack_nsys("cache_on_warm"),
     }
+    if prior_sqlite:
+        data["sqlite"] = prior_sqlite
+
+    r2 = client["request_2"]
+    print(
+        f"R2 TTFT  OFF={r2['off_ttft_ms']} ms  ON={r2['on_ttft_ms']} ms  "
+        f"saved={r2['ttft_saved_ms']} ms  reduction={r2['ttft_reduction_pct']}%  "
+        f"speedup={r2['ttft_speedup']}x"
+    )
+    expected = (339.3, 85.7, 7.0)
+    got = (r2["ttft_saved_ms"], r2["ttft_reduction_pct"], r2["ttft_speedup"])
+    if got != expected:
+        print(f"WARNING: derived {got} != expected {expected}")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

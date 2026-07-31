@@ -1,31 +1,93 @@
 {
   "meta": {
-    "title": "vLLM Automatic Prefix Cache \u2014 Nsight A/B",
+    "title": "Profiling vLLM Automatic Prefix Caching",
+    "subtitle": "A controlled cache ON/OFF experiment measuring repeated-prefix TTFT and tracing CPU/GPU execution with NVIDIA Nsight Systems.",
     "model": "Qwen/Qwen2.5-1.5B-Instruct",
     "gpu": "NVIDIA RTX 4060 Laptop (~8 GB)",
-    "protocol": "Unrelated warmup \u2192 2 shared-prefix Qasper prompts",
-    "caveat": "Whole-session HtoD totals match because ~3GB weight upload dominates. SQLite-filtered view: split tiny vs large HtoD, and kernel time in the last 30s of each trace (after load) \u2014 that is where cache OFF does more prefill GEMM / attention work.",
+    "engine": "vLLM",
+    "workload": "Qasper shared-prefix (1024-token paper)",
+    "protocol": "Unrelated warmup \u2192 shared-prefix Request 1 \u2192 shared-prefix Request 2",
+    "chips": [
+      "Qwen2.5-1.5B-Instruct",
+      "NVIDIA RTX 4060 Laptop GPU",
+      "vLLM",
+      "Qasper \u00b7 1024-token shared paper prefix",
+      "NVIDIA Nsight Systems"
+    ],
+    "repo_url": "https://github.com/sudhersankv/gpu-programming",
+    "lab_readme_url": "https://github.com/sudhersankv/gpu-programming/tree/main/llm-inference-runtime-lab",
+    "harness_url": "https://github.com/sudhersankv/gpu-programming/blob/main/llm-inference-runtime-lab/scripts/profile_prefix_cache.py",
+    "scripts_url": "https://github.com/sudhersankv/gpu-programming/tree/main/llm-inference-runtime-lab/scripts",
     "data_sources": [
-      "nsys stats CSVs (session kernel/API summaries)",
-      "CUPTI_ACTIVITY_KIND_MEMCPY + CUPTI_ACTIVITY_KIND_KERNEL from local .sqlite"
+      "profiling/bench/warm_cache_ab.json (client TTFT/E2E)",
+      "profiling/stats/* CSV (whole-session nsys stats)",
+      "CUPTI_ACTIVITY_KIND_MEMCPY + KERNEL from local .sqlite (late-trace filter)"
     ]
   },
-  "client_ttft": {
-    "source": "Phase 5 shared-prefix bench (cache ON); profile JSONL was not persisted",
-    "series": [
-      {
-        "label": "Q1 (miss)",
-        "ttft_s": 2.3
+  "client": {
+    "source": "Client timings from profile_prefix_cache.py warm runs (cache_on_warm / cache_off_warm); pasted from harness terminal output and committed as the experiment record.",
+    "experiment_id": "warm_cache_ab_qasper_shared",
+    "cache_on": {
+      "request_1": {
+        "ttft_ms": 730.2,
+        "ttft_s": 0.7302,
+        "e2e_s": 1.9538,
+        "output_tok_per_s": 52.3
       },
-      {
-        "label": "Q2 (hit)",
-        "ttft_s": 0.04
+      "request_2": {
+        "ttft_ms": 56.5,
+        "ttft_s": 0.0565,
+        "e2e_s": 0.8389,
+        "output_tok_per_s": 51.1
       }
+    },
+    "cache_off": {
+      "request_1": {
+        "ttft_ms": 716.6,
+        "ttft_s": 0.7166,
+        "e2e_s": 1.992,
+        "output_tok_per_s": 50.2
+      },
+      "request_2": {
+        "ttft_ms": 395.8,
+        "ttft_s": 0.3958,
+        "e2e_s": 1.1531,
+        "output_tok_per_s": 52.8
+      }
+    },
+    "request_2": {
+      "ttft_saved_ms": 339.3,
+      "ttft_reduction_pct": 85.7,
+      "ttft_speedup": 7.0,
+      "off_ttft_ms": 395.8,
+      "on_ttft_ms": 56.5
+    },
+    "request_1_match": {
+      "on_ttft_ms": 730.2,
+      "off_ttft_ms": 716.6,
+      "abs_delta_ms": 13.6
+    }
+  },
+  "nsight_findings": {
+    "bullets": [
+      "Cache OFF executed the full prefill transformer path for Request 2.",
+      "Cache ON reused GPU-resident KV blocks and computed only the uncached suffix.",
+      "Decode CUDA Graph execution remained similar in both runs.",
+      "Output-token throughput stayed approximately unchanged (~50\u201353 tok/s).",
+      "Small Host\u2192Device copies near request execution are consistent with input and runtime metadata transfers \u2014 not evidence that every copy is specifically a KV block-table update.",
+      "Cached KV tensors were not restored Host\u2192Device; reused KV remained resident in GPU memory."
     ],
-    "note": "Illustrates the prefix-hit TTFT drop with APC on. Warm ON/OFF profile client timings were not saved to disk."
+    "kernels": [
+      "Tensor Core BF16 GEMMs (ampere_bf16 / Cutlass)",
+      "FlashAttention forward (flash_fwd_splitkv)",
+      "vllm::reshape_and_cache_flash",
+      "Fused Triton SiLU and normalization kernels",
+      "CUDA Graph replay during decoding"
+    ]
   },
   "cache_off": {
     "stem": "cache_off_warm",
+    "scope": "whole_session",
     "mem": [
       {
         "operation": "memcpy Host-to-Device",
@@ -193,6 +255,7 @@
   },
   "cache_on": {
     "stem": "cache_on_warm",
+    "scope": "whole_session",
     "mem": [
       {
         "operation": "memcpy Host-to-Device",

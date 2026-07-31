@@ -269,14 +269,12 @@ At a glance the two timelines still look alike. The difference shows up when you
 
 ### Dashboard (GitHub Pages)
 
-Static comparison page built from `nsys stats` CSVs **plus** filtered queries on the local Nsight `.sqlite` exports:
+Recruiter-facing case study of the warm cache ON/OFF experiment:
 
-* Live: [APC Nsight A/B dashboard](https://sudhersankv.github.io/gpu-programming/)
-* Source: repo-root `docs/` (`index.html`, `data.json`, screenshots)
-* CSVs: `profiling/stats/`
-* SQLite (local only, gitignored): `profiling/reports/*.sqlite` → `scripts/query_nsys_sqlite.py`
-
-Rebuild after new traces:
+* Live: [Profiling vLLM Automatic Prefix Caching](https://sudhersankv.github.io/gpu-programming/)
+* Client timings: `profiling/bench/warm_cache_ab.json` (derived metrics in `scripts/build_apc_dashboard_data.py`)
+* Nsight CSVs: `profiling/stats/`
+* Late-trace SQLite filters: `scripts/query_nsys_sqlite.py` (local `.sqlite` only)
 
 ```powershell
 python scripts\export_nsys_stats.py

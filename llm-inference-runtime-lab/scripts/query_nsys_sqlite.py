@@ -152,20 +152,19 @@ def main() -> int:
         return 1
 
     data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    data["meta"]["caveat"] = (
-        "Whole-session HtoD totals match because ~3GB weight upload dominates. "
-        "SQLite-filtered view: split tiny vs large HtoD, and kernel time in the "
-        "last 30s of each trace (after load) — that is where cache OFF does more "
-        "prefill GEMM / attention work."
-    )
-    data["meta"]["data_sources"] = [
-        "nsys stats CSVs (session kernel/API summaries)",
-        "CUPTI_ACTIVITY_KIND_MEMCPY + CUPTI_ACTIVITY_KIND_KERNEL from local .sqlite",
-    ]
     data["sqlite"] = {
         "cache_off": pack("cache_off_warm"),
         "cache_on": pack("cache_on_warm"),
     }
+    # Keep recruiter-facing meta from build_apc_dashboard_data.py; only annotate sources.
+    sources = data.setdefault("meta", {}).setdefault("data_sources", [])
+    for item in (
+        "profiling/bench/warm_cache_ab.json (client TTFT/E2E)",
+        "profiling/stats/* CSV (whole-session nsys stats)",
+        "CUPTI_ACTIVITY_KIND_MEMCPY + KERNEL from local .sqlite (late-trace filter)",
+    ):
+        if item not in sources:
+            sources.append(item)
 
     DATA_PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     off_k = data["sqlite"]["cache_off"]["kernels_late_30s"]["total_time_ms"]
