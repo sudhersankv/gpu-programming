@@ -1,25 +1,19 @@
-# docs/
+# APC Nsight dashboard (GitHub Pages)
 
-Static GitHub Pages site for the LLM Inference Runtime Lab.
+Static site for the LLM Inference Runtime Lab Phase 6 A/B:
 
-## APC Nsight A/B dashboard
+- `index.html` — comparison UI
+- `data.json` — summarized from `nsys stats` CSVs
+- `assets/` — warm ON/OFF timeline screenshots
 
-Open locally: open `index.html` in a browser (needs `data.json` beside it), or after Pages is enabled:
+**URL (after Pages is enabled):** https://sudhersankv.github.io/gpu-programming/
 
-https://sudhersankv.github.io/gpu-programming/
-
-### Regenerate data
-
-From `llm-inference-runtime-lab/` (requires Docker image `llm-lab-vllm:profile` and local `.nsys-rep` files):
+Rebuild from the lab folder:
 
 ```powershell
+cd llm-inference-runtime-lab
 python scripts\export_nsys_stats.py
 python scripts\build_apc_dashboard_data.py
 ```
 
-Then copy refreshed screenshots if needed:
-
-```powershell
-Copy-Item profiling\screenshots\warm_cache_off_vs_cache_on.png ..\docs\assets\warm_events.png
-Copy-Item profiling\screenshots\warm_cache_off_vs_cache_on_xoomed_out.png ..\docs\assets\warm_overview.png
-```
+Repo **Settings → Pages → Deploy from branch `main` → folder `/docs`**.

@@ -41,3 +41,5 @@ llm-inference-runtime-lab/results/*
 llm-inference-runtime-lab/profiling/reports/*.nsys-rep
 llm-inference-runtime-lab/profiling/reports/*.qdrep
 llm-inference-runtime-lab/profiling/reports/*.sqlite
+# Keep small nsys stats CSVs for the GitHub Pages dashboard
+!llm-inference-runtime-lab/profiling/stats/*.csv
