@@ -1,0 +1,31 @@
+# Phase 7: vLLM + LMCache (in-process) for a short smoke test.
+# Single container — no standalone LMCache server.
+#
+# Build (from llm-inference-runtime-lab/):
+#   docker build -f docker/Dockerfile.lmcache -t llm-lab-vllm:lmcache .
+#
+# Run:
+#   .\scripts\run_lmcache_container.ps1
+
+FROM vllm/vllm-openai:v0.11.0
+
+RUN pip install --no-cache-dir lmcache httpx
+
+COPY docker/lmcache_config.yaml /etc/lmcache/config.yaml
+
+ENV HF_HOME=/root/.cache/huggingface \
+    MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct \
+    LMCACHE_CONFIG_FILE=/etc/lmcache/config.yaml \
+    LMCACHE_LOG_LEVEL=INFO
+
+EXPOSE 8000
+
+# Bake LMCache connector JSON into the image so Windows PowerShell
+# does not mangle quotes when passing --kv-transfer-config.
+CMD [ \
+     "--model", "Qwen/Qwen2.5-1.5B-Instruct", \
+     "--max-model-len", "4096", \
+     "--gpu-memory-utilization", "0.75", \
+     "--disable-hybrid-kv-cache-manager", \
+     "--kv-transfer-config", "{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}" \
+]

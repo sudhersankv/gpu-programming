@@ -16,7 +16,7 @@ This project is being built incrementally. Each phase introduces a new inference
 * [x] **Phase 4** — Shared-prefix workload generation (Qasper)
 * [x] **Phase 5** — vLLM automatic prefix caching (shared vs control)
 * [x] **Phase 6** — Profiling literacy (Nsight Systems) — *learning first*
-* [ ] Phase 7 — LMCache integration
+* [x] **Phase 7** — LMCache smoke test (plugin check, then move on)
 * [ ] Phase 8 — SGLang comparison
 * [ ] Phase 9 — TensorRT-LLM comparison
 * [ ] Phase 10 — AMD ROCm experiments
@@ -292,13 +292,62 @@ Optional later: NVTX labels per request, keep bench JSONL next to reports, Nsigh
 
 ---
 
+## Phase 7 — LMCache smoke test (done)
+
+LMCache is an offload / external KV plugin on top of vLLM. This phase only **proves store + hit lookup**, then we move on — no multi-paper eviction study.
+
+**Image:** `llm-lab-vllm:lmcache` (`docker/Dockerfile.lmcache`) — vLLM 0.11.0 + `lmcache`, in-process `LMCacheConnectorV1`, config `docker/lmcache_config.yaml` (`chunk_size: 16`, local CPU). Connector JSON is baked into the image `CMD` so Windows PowerShell does not strip quotes.
+
+### Build & run
+
+```powershell
+cd D:\cuda\llm-inference-runtime-lab
+
+docker build -f docker/Dockerfile.lmcache -t llm-lab-vllm:lmcache .
+
+.\scripts\run_lmcache_container.ps1
+docker logs -f llm-lab-lmcache
+```
+
+### Smoke client
+
+```powershell
+python scripts\smoke_lmcache.py
+```
+
+Qasper shared-prefix **R1** then **R2** (same paper, different questions). Saves `results/lmcache_smoke.json` (gitignored).
+
+### Results (this machine)
+
+| | Request 1 (miss) | Request 2 (shared prefix) |
+|--|------------------|---------------------------|
+| Client TTFT | **4.284 s** | **0.076 s** |
+| LMCache log | `hit tokens: 0` → `Stored 1075/1075` (~0.029 GB, ~62 ms) | `hit tokens: 1056` → `Stored 20/20` (new question only) |
+
+`need to load: 0` on R2 means GPU **APC** already held the prefix in HBM, so LMCache did not CPU→GPU restore — but it still **stored** on R1 and **matched** the hit on R2. To force an LMCache retrieve path, rerun with `--no-enable-prefix-caching` (not required for this smoke).
+
+### Pass criteria
+
+| Request | Expect in `docker logs` |
+|---------|-------------------------|
+| R1 | `LMCache INFO: Stored … tokens` |
+| R2 | `LMCache hit tokens: …` (and optionally `Retrieved` if APC is off) |
+
+```powershell
+docker stop llm-lab-lmcache
+```
+
+Next: **Phase 8 SGLang**.
+
+---
+
 # Environment
 
 * Windows 11 + Docker Desktop (WSL2 / Linux engine)
 * Python 3.12 (host venv for clients)
 * NVIDIA RTX 4060 Laptop GPU (~8 GB)
 * CUDA-enabled PyTorch + Hugging Face Transformers
-* vLLM in Docker (`llm-lab-vllm:phase2`, profiling image `llm-lab-vllm:profile`)
+* vLLM in Docker (`llm-lab-vllm:phase2`, `llm-lab-vllm:profile`, `llm-lab-vllm:lmcache`)
 * Nsight Systems CLI inside the profile image; GUI on the Windows host
 
 ---
@@ -394,10 +443,9 @@ python plot_qasper_prefix.py
 
 # Future Work
 
-* Optional Phase 6.1: NVTX per request, persist bench JSONL with reports, Nsight Compute, PyTorch Profiler
-* Prompt-length sweeps (512 / 2048 token fixtures)
-* Concurrency sweeps
-* LMCache
-* SGLang / TensorRT-LLM / ROCm
+* Phase 8 — SGLang (same Qasper A1/A2 harness questions)
+* TensorRT-LLM / MAX comparisons
+* Optional Phase 6.1: NVTX per request, persist bench JSONL with reports, Nsight Compute
+* Prompt-length / concurrency sweeps
 
-Each phase will introduce one new systems concept while keeping the benchmark methodology consistent.
+Each phase keeps the same questions: TTFT, throughput, memory, prefix reuse, deploy pain.

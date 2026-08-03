@@ -1,0 +1,7 @@
+# LMCache in-process config for the lab smoke test.
+# Small chunk_size makes store/retrieve log lines easier to see.
+# Use chunk_size: 256 for anything beyond a quick demo.
+
+chunk_size: 16
+local_cpu: true
+max_local_cpu_size: 4
