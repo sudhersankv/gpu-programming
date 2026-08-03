@@ -27,6 +27,7 @@ gpu-programming/
 ├── flashattention/       # attention kernels / papers practice
 ├── vllm/                 # LLM serving (planned)
 ├── llm-inference-runtime-lab/  # HF / vLLM serving benchmarks + Nsight
+├── inference-systems-notebooks/  # Standalone Colab notebooks (toy → runtime)
 ├── docs/                 # GitHub Pages (APC Nsight A/B dashboard)
 ├── notes/                # theory, cheat sheets
 └── scripts/              # Windows build + env helpers
@@ -34,6 +35,8 @@ gpu-programming/
 
 **Live dashboard:** [Profiling vLLM Automatic Prefix Caching](https://sudhersankv.github.io/gpu-programming/)  
 (Enable Pages: Settings → Pages → Deploy from branch → `/docs`.)
+
+**Parallel track:** [Inference systems notebooks](inference-systems-notebooks/) — Colab toys for KV, paging, APC, scheduling, etc. (upload notebooks as you finish them).
 
 ## Setup (CUDA track)
 
