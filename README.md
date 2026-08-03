@@ -36,7 +36,7 @@ gpu-programming/
 **Live dashboard:** [Profiling vLLM Automatic Prefix Caching](https://sudhersankv.github.io/gpu-programming/)  
 (Enable Pages: Settings → Pages → Deploy from branch → `/docs`.)
 
-**Parallel track:** [Inference systems notebooks](inference-systems-notebooks/) — Colab toys for KV, paging, APC, scheduling, etc. (upload notebooks as you finish them).
+**Parallel track:** [Inference systems notebooks](inference-systems-notebooks/) — standalone Colab curriculum (toy KV / paging / scheduling → map to real runtimes). Notebooks published as they are completed.
 
 ## Setup (CUDA track)
 
