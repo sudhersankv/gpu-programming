@@ -1,121 +1,115 @@
 # GPU Programming
 
-Hands-on path from CUDA kernels → profiling → Triton / HIP / TensorRT / attention & serving stacks.
+Hands-on work across **CUDA kernels**, **LLM inference runtimes**, and **systems notebooks** — building intuition from small experiments up to real serving stacks.
 
-This README is the living index. Add a row (and a short section) when you open a new folder.
+This repository is a learning lab and portfolio of tracks. Each major folder owns its own documentation. **This root README is the map**, not a copy of every experiment.
 
-## Layout
+---
 
-```
+## Why this exists
+
+Modern GPU and LLM-serving work spans several layers:
+
+* writing and reasoning about CUDA kernels  
+* measuring inference engines (TTFT, throughput, memory, prefix reuse)  
+* understanding the systems ideas behind paged KV, scheduling, and attention IO  
+
+Those are easy to blur together. Here they stay in **separate tracks** with clear entry points.
+
+---
+
+## Start here
+
+| If you want to… | Go to |
+|-----------------|--------|
+| Learn CUDA C++ kernels on Windows | [`cuda/`](cuda/) |
+| Benchmark and profile vLLM / prefix cache / LMCache | [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/) |
+| Work through Colab toys (KV, paging, scheduling, …) | [`inference-systems-notebooks/`](inference-systems-notebooks/) |
+| See the APC Nsight case study in the browser | [Live dashboard](https://sudhersankv.github.io/gpu-programming/) · [`docs/`](docs/) |
+
+---
+
+## Tracks
+
+### CUDA kernels — [`cuda/`](cuda/README.md)
+
+Progressive `nvcc` lessons: hello world → memory → indexing → matmul → reduction / shared memory (in progress).
+
+**Setup, build commands, and per-lesson notes:** see the [CUDA track README](cuda/README.md).
+
+### LLM inference runtime lab — [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/README.md)
+
+Dockerized serving experiments: Hugging Face baseline → vLLM → shared-prefix (Qasper) benchmarks → Nsight Systems → LMCache smoke test → next engines (SGLang, …).
+
+**Methodology, results, scripts, and reproducibility** live only in that README — do not duplicate them here.
+
+### Inference systems notebooks — [`inference-systems-notebooks/`](inference-systems-notebooks/README.md)
+
+Standalone Colab notebooks: toy implementations first, then links to real runtimes. Complements the Docker lab; no container required.
+
+**Curriculum, status, and notebook philosophy** live only in that README.
+
+### Case study dashboard — [`docs/`](docs/)
+
+Static GitHub Pages site summarizing the warm cache ON/OFF Nsight experiment from the runtime lab.
+
+### Planned / thin folders
+
+| Folder | Intent |
+|--------|--------|
+| [`profiling/`](profiling/) | Cross-cutting Nsight / roofline notes (lab Phase 6 is the main Nsight work today) |
+| [`triton/`](triton/) | Triton kernels |
+| [`hip/`](hip/) | AMD / HIP ports |
+| [`tensorrt/`](tensorrt/) | TensorRT |
+| [`flashattention/`](flashattention/) | Attention kernels / paper practice |
+| [`notes/`](notes/) | Theory and cheat sheets |
+
+Each of these should get its own README when real content lands.
+
+---
+
+## Progress (high level)
+
+| Track | Status |
+|-------|--------|
+| CUDA kernels | Lessons 01–04 done; 05–06 planned — [details](cuda/README.md) |
+| Inference runtime lab | Phases 1–7 done; Phase 8+ (SGLang, …) next — [details](llm-inference-runtime-lab/README.md) |
+| Systems notebooks | Curriculum published; notebooks uploading over time — [details](inference-systems-notebooks/README.md) |
+| GitHub Pages dashboard | Available — [open](https://sudhersankv.github.io/gpu-programming/) |
+
+---
+
+## Repository layout
+
+```text
 gpu-programming/
-├── README.md
-├── cuda/                 # CUDA C++ lessons (nvcc)
-│   ├── 01_hello_cuda/
-│   ├── 02_vector_addition/
-│   ├── 03_matrix_addition/
-│   ├── 04_matrix_multiply/
-│   ├── 05_reduction/         # planned
-│   ├── 06_shared_memory/     # planned
-│   └── ...
-├── profiling/            # Nsight, roofline, perf notes
-│   ├── nsight_systems/
-│   ├── nsight_compute/
-│   └── roofline/
-├── triton/               # Triton kernels
-├── hip/                  # AMD / HIP ports
-├── tensorrt/             # inference engine
-├── flashattention/       # attention kernels / papers practice
-├── vllm/                 # LLM serving (planned)
-├── llm-inference-runtime-lab/  # HF / vLLM serving benchmarks + Nsight
-├── inference-systems-notebooks/  # Standalone Colab notebooks (toy → runtime)
-├── docs/                 # GitHub Pages (APC Nsight A/B dashboard)
-├── notes/                # theory, cheat sheets
-└── scripts/              # Windows build + env helpers
+├── README.md                         ← you are here (navigation)
+├── cuda/                             ← CUDA C++ track (+ README)
+├── llm-inference-runtime-lab/        ← serving / bench / Nsight / LMCache
+├── inference-systems-notebooks/      ← Colab curriculum
+├── docs/                             ← GitHub Pages dashboard
+├── profiling/ triton/ hip/ …         ← planned tracks
+└── scripts/                          ← shared Windows helpers
 ```
 
-**Live dashboard:** [Profiling vLLM Automatic Prefix Caching](https://sudhersankv.github.io/gpu-programming/)  
-(Enable Pages: Settings → Pages → Deploy from branch → `/docs`.)
+---
 
-**Parallel track:** [Inference systems notebooks](inference-systems-notebooks/) — standalone Colab curriculum (toy KV / paging / scheduling → map to real runtimes). Notebooks published as they are completed.
+## Documentation ownership
 
-## Setup (CUDA track)
+| README | Owns |
+|--------|------|
+| **This file** | What the repo is, track map, where to start |
+| [`cuda/README.md`](cuda/README.md) | CUDA setup, builds, lesson notes |
+| [`llm-inference-runtime-lab/README.md`](llm-inference-runtime-lab/README.md) | Lab methodology, results, scripts |
+| [`inference-systems-notebooks/README.md`](inference-systems-notebooks/README.md) | Notebook philosophy and curriculum |
+| [`docs/README.md`](docs/README.md) | How to rebuild / deploy the dashboard |
 
-**Required**
+Detailed content belongs in the track README. The root only summarizes and links.
 
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) (`nvcc` on `PATH`)
-- Visual Studio 2022 **Build Tools** with MSVC (`cl.exe`)
-- Windows 10/11 SDK (linking, e.g. `uuid.lib`)
+---
 
-**Optional Python helpers**
+## Shared notes
 
-```powershell
-pip install -r requirements.txt
-python scripts\verify_env.py
-```
-
-## Build & run (CUDA)
-
-```powershell
-# load VS x64 tools into this terminal (once per shell)
-cmd /k '"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"'
-
-nvcc cuda\01_hello_cuda\hello_cuda.cu -o hello_cuda
-.\hello_cuda.exe
-```
-
-Or:
-
-```powershell
-.\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu -Run
-.\scripts\build_cu.ps1 cuda\02_vector_addition\vector_addition.cu -Run
-.\scripts\build_cu.ps1 cuda\03_matrix_addition\matrix_addition.cu -Run
-.\scripts\build_cu.ps1 cuda\04_matrix_multiply\matmul.cu -Run
-```
-
-## Progress
-
-### CUDA
-
-| # | Folder | Status | Idea |
-|---|--------|--------|------|
-| 01 | [`cuda/01_hello_cuda`](cuda/01_hello_cuda) | done | Launch a kernel; print from GPU threads |
-| 02 | [`cuda/02_vector_addition`](cuda/02_vector_addition) | done | Host ↔ device memory; elementwise add |
-| 03 | [`cuda/03_matrix_addition`](cuda/03_matrix_addition) | done | 2D thread indexing; flat matrix storage |
-| 04 | [`cuda/04_matrix_multiply`](cuda/04_matrix_multiply) | done | Naive GEMM; one thread per output; 2D grid |
-| 05 | [`cuda/05_reduction`](cuda/05_reduction) | planned | Parallel reduce patterns |
-| 06 | [`cuda/06_shared_memory`](cuda/06_shared_memory) | planned | Tiling with `__shared__` |
-
-### Other tracks
-
-| Area | Folder | Status |
-|------|--------|--------|
-| Profiling | [`profiling/`](profiling/) | Nsight learning (see inference lab Phase 6) |
-| Triton | [`triton/`](triton/) | planned |
-| HIP | [`hip/`](hip/) | planned |
-| TensorRT | [`tensorrt/`](tensorrt/) | planned |
-| FlashAttention | [`flashattention/`](flashattention/) | planned |
-| vLLM | [`vllm/`](vllm/) | planned |
-| Inference lab | [`llm-inference-runtime-lab/`](llm-inference-runtime-lab/) | Phases 1–6 done (APC = metadata, KV stays on GPU) |
-| Notes | [`notes/`](notes/) | planned |
-
-### 01 — Hello CUDA
-
-Minimal `__global__` kernel. Grid `<<<2, 5>>>` → 2 blocks × 5 threads; each thread prints its `threadIdx.x`. `cudaDeviceSynchronize()` so host waits for device prints.
-
-### 02 — Vector addition
-
-CPU loop (commented) vs GPU kernel: `cudaMalloc` / `cudaMemcpy` H2D → `addVectors<<<1, N>>>` → D2H → `cudaFree`. Indexing with `blockIdx.x * blockDim.x + threadIdx.x`.
-
-### 03 — Matrix addition
-
-2×3 matrices as flat device arrays (`row * cols + col`). Kernel uses 2D indices: `row` / `col` from `blockIdx` + `threadIdx`. Launch with `dim3 threads(ROWS, COLS)` and one block: `matrixAddition<<<1, threads>>>`.
-
-### 04 — Matrix multiply
-
-Naive `C(M×N) = A(M×K) × B(K×N)`. Host keeps 2D arrays; device uses flat row-major (`A[row*K+k]`, `B[k*N+col]`, `C[row*N+col]`). Each thread owns one `C[row][col]` and loops over `K`. Launch with `dim3 block(16,16)` and a ceiling-divided 2D grid over the output.
-
-## Notes
-
-- Prefer `.cu` + `nvcc` on Windows for the `cuda/` track; `gcc` is not required.
-- Build artifacts (`*.exe`, `*.obj`, `*.lib`, `*.exp`, …) are gitignored.
-- Empty planned folders use `.gitkeep` so the tree stays visible until real code lands.
+* Prefer track-local docs over expanding this file.
+* Build artifacts (`*.exe`, `*.obj`, …) and large profiler traces are gitignored.
+* Empty planned folders may use `.gitkeep` so the tree stays visible.
