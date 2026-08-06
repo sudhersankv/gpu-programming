@@ -24,25 +24,31 @@ The current sequence is:
 
 The real-runtime track currently covers vLLM, Nsight Systems, and LMCache. SGLang is the next planned runtime comparison, followed later by TensorRT-LLM, ROCm, concurrency experiments, and deeper profiling.
 
+Kernel practice has moved to a [LeetGPU](https://leetgpu.com)-first workflow (CUDA, Triton, PyTorch, JAX, Mojo, CuTe) so I can iterate without a local `nvcc` loop.
+
 ---
 
 ## Repository tracks
 
-### CUDA fundamentals
+### LeetGPU kernels
 
-[`cuda/`](cuda/README.md)
+[`leetgpu/`](leetgpu/README.md)
 
-Small CUDA C++ programs used to learn:
+Primary kernel track. Write under `leetgpu/<language>/`, run with the [LeetGPU CLI](https://leetgpu.com/cli) — no local GPU required for the practice loop.
 
-* kernel launches
-* thread and block indexing
-* host and device memory
-* flat matrix storage
-* matrix operations
-* reduction patterns
-* shared memory and tiling
+```powershell
+# once
+Invoke-WebRequest -Uri https://cli.leetgpu.com/install.ps1 -OutFile install.ps1; ./install.ps1
 
-Setup instructions, build commands, lesson notes, and progress are maintained in the [CUDA README](cuda/README.md).
+# run a lesson
+.\scripts\leetgpu_run.ps1 leetgpu\cuda\01_hello_cuda\hello_cuda.cu
+```
+
+Languages: CUDA, Triton, PyTorch, JAX, Mojo, CuTe DSL. CUDA lessons cover kernel launches, indexing, memory, matmul, reduction, and (planned) shared memory.
+
+Setup, CLI usage, lesson notes, and progress live in the [LeetGPU README](leetgpu/README.md).
+
+> Legacy path: [`cuda/`](cuda/) only redirects here. Prefer `leetgpu/`.
 
 ---
 
@@ -104,7 +110,7 @@ The Nsight timeline alone does not prove that any individual transfer is specifi
 
 | Track                       | Current status                                                         |
 | --------------------------- | ---------------------------------------------------------------------- |
-| CUDA fundamentals           | Lessons 01–04 complete, reduction in progress                          |
+| LeetGPU kernels             | CUDA lessons 01–04 complete; 05 in progress; other languages scaffolded |
 | Inference systems notebooks | Notebook 01 available; remaining notebooks added as I study each topic |
 | Inference runtime lab       | Phases 1–7 complete                                                    |
 | SGLang comparison           | Planned next runtime phase                                             |
@@ -136,8 +142,10 @@ The Nsight timeline alone does not prove that any individual transfer is specifi
 gpu-programming/
 ├── README.md
 │
-├── cuda/
-│   └── README.md
+├── leetgpu/
+│   ├── README.md
+│   ├── cuda/                 ← progressive CUDA lessons + challenges/
+│   ├── triton/ pytorch/ jax/ mojo/ cute/
 │
 ├── inference-systems-notebooks/
 │   ├── README.md
@@ -155,15 +163,14 @@ gpu-programming/
 │   └── GitHub Pages prefix-caching case study
 │
 ├── profiling/
-├── triton/
 ├── hip/
 ├── tensorrt/
 ├── flashattention/
 ├── notes/
-└── scripts/
+└── scripts/                  ← leetgpu_run.ps1, optional build_cu.ps1
 ```
 
-Some top-level folders are placeholders for work I plan to add later. They should not be treated as completed tracks.
+Some top-level folders are placeholders for work I plan to add later. They should not be treated as completed tracks. Kernel languages supported by LeetGPU live under `leetgpu/`.
 
 ---
 
@@ -174,7 +181,7 @@ The repository has multiple README files with separate responsibilities.
 | README                                                                           | Purpose                                                                |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | [`README.md`](README.md)                                                         | High-level repository map and current progress                         |
-| [`cuda/README.md`](cuda/README.md)                                               | CUDA setup, build commands, lesson notes, and progress                 |
+| [`leetgpu/README.md`](leetgpu/README.md)                                         | LeetGPU CLI setup, languages, CUDA lesson notes                        |
 | [`inference-systems-notebooks/README.md`](inference-systems-notebooks/README.md) | Notebook topics, design notes, and status                              |
 | [`llm-inference-runtime-lab/README.md`](llm-inference-runtime-lab/README.md)     | Runtime methodology, benchmark results, profiling, and reproducibility |
 | [`docs/README.md`](docs/README.md)                                               | Dashboard generation and deployment                                    |
@@ -201,3 +208,5 @@ The measurements are specific to the documented:
 They are intended to help me understand runtime behavior. They should not be interpreted as general datacenter-performance claims.
 
 Some explanations and conclusions may be revised as I learn more or inspect the systems at a deeper level.
+
+Kernel practice prefers the LeetGPU CLI; local `nvcc` (`scripts/build_cu.ps1`) is optional.

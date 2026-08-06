@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 
+# LeetGPU CLI installer dropped in repo root by mistake
+/install.ps1
+/install.sh
+
 # CUDA build artifacts
 *.exe
 *.obj

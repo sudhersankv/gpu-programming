@@ -1,7 +1,10 @@
-# Compile and run a CUDA .cu file with nvcc (Windows-friendly).
+# Optional local fallback: compile/run a .cu with nvcc (Windows-friendly).
+# Prefer LeetGPU for day-to-day practice:
+#   .\scripts\leetgpu_run.ps1 leetgpu\cuda\01_hello_cuda\hello_cuda.cu
+#
 # Usage:
-#   .\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu
-#   .\scripts\build_cu.ps1 cuda\01_hello_cuda\hello_cuda.cu -OutDir build -Run
+#   .\scripts\build_cu.ps1 leetgpu\cuda\01_hello_cuda\hello_cuda.cu
+#   .\scripts\build_cu.ps1 leetgpu\cuda\01_hello_cuda\hello_cuda.cu -OutDir build -Run
 
 param(
     [Parameter(Mandatory = $true, Position = 0)]

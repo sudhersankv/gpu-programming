@@ -1,4 +1,5 @@
 # Light Python helpers for checking results / plots.
-# CUDA C++ itself uses the globally installed Toolkit (nvcc on PATH).
+# Kernel practice uses the LeetGPU CLI (see leetgpu/README.md).
+# Local nvcc is optional.
 numpy>=1.26
 matplotlib>=3.8
