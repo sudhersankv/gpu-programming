@@ -5,6 +5,6 @@ Kernel practice (CUDA and other languages) now lives under **[`leetgpu/`](../lee
 * CUDA lessons: [`leetgpu/cuda/`](../leetgpu/cuda/)
 * How to install the CLI and run kernels: [`leetgpu/README.md`](../leetgpu/README.md)
 
-```powershell
+```powwershell
 .\scripts\leetgpu_run.ps1 leetgpu\cuda\01_hello_cuda\hello_cuda.cu
 ```
