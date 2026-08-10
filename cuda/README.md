@@ -1,4 +1,4 @@
-# Moved → LeetGPU track
+ # Moved → LeetGPU track
 
 Kernel practice (CUDA and other languages) now lives under **[`leetgpu/`](../leetgpu/)**.
 
