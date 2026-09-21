@@ -30,6 +30,17 @@ vec_add
 .DS_Store
 Thumbs.db
 
+# Local RunPod / OpenCode setup (not part of Agentic Inference Optimization)
+opencode.json
+.opencode/
+publickeyrunpod.txt
+publickeyrunpod.txt.pub
+*.pem
+id_ed25519
+id_ed25519.pub
+id_rsa
+id_rsa.pub
+
 # Local notes / outputs
 *.log
 out/

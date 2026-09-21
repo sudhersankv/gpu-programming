@@ -10,25 +10,27 @@ This is an evolving learning repository, not a finished framework or formal cour
 
 ## Current focus
 
-I am currently building small inference-systems notebooks to understand individual concepts before returning to broader runtime comparisons.
+The current project is **[Agentic Inference Optimization](agentic-inference-optimization/)**.
 
-The current sequence is:
+It is in **Phase 1 — Exploration and System Understanding**. The work is learning the path from a RunPod GPU instance to generated tokens before any Observation Deck, benchmark framework, or agents are implemented.
 
-* prefill, decode, and KV caching
-* KV-cache memory scaling
-* paged KV memory and block tables
-* automatic prefix caching
-* RadixAttention and SGLang
-* continuous batching and scheduling
-* memory tiers and KV-cache offloading
+All files for that project live in [`agentic-inference-optimization/`](agentic-inference-optimization/).
 
-The real-runtime track currently covers vLLM, Nsight Systems, and LMCache. SGLang is the next planned runtime comparison, followed later by TensorRT-LLM, ROCm, concurrency experiments, and deeper profiling.
-
-Kernel practice has moved to a [LeetGPU](https://leetgpu.com)-first workflow (CUDA, Triton, PyTorch, JAX, Mojo, CuTe) so I can iterate without a local `nvcc` loop.
+Kernel practice continues under [LeetGPU](https://leetgpu.com). Earlier laptop inference experiments remain in the runtime lab and notebooks; they are background, not this system.
 
 ---
 
 ## Repository tracks
+
+### Agentic Inference Optimization
+
+[`agentic-inference-optimization/`](agentic-inference-optimization/README.md)
+
+Long-term project: observe real LLM inference on GPUs, diagnose behavior, and later use agents to propose and evaluate optimizations.
+
+**Not built yet.** Current work is Phase 1 exploration only (GPU environment, model choice, loading, request lifecycle, KV cache, vLLM execution). Implementation starts only after that pipeline is understood.
+
+---
 
 ### LeetGPU kernels
 
@@ -108,11 +110,12 @@ The Nsight timeline alone does not prove that any individual transfer is specifi
 
 ## Progress
 
-| Track                       | Current status                                                         |
-| --------------------------- | ---------------------------------------------------------------------- |
-| LeetGPU kernels             | CUDA lessons 01–04 complete; 05 in progress; other languages scaffolded |
-| Inference systems notebooks | Notebook 01 available; remaining notebooks added as I study each topic |
-| Inference runtime lab       | Phases 1–7 complete                                                    |
+| Track                          | Current status                                                         |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| Agentic Inference Optimization | Phase 1 — exploration; project folder created, nothing implemented yet |
+| LeetGPU kernels                | CUDA lessons 01–04 complete; 05 in progress; other languages scaffolded |
+| Inference systems notebooks    | Notebook 01 available; remaining notebooks added as I study each topic |
+| Inference runtime lab          | Phases 1–7 complete                                                    |
 | SGLang comparison           | Planned next runtime phase                                             |
 | TensorRT-LLM experiments    | Planned                                                                |
 | AMD HIP / ROCm experiments  | Planned                                                                |
@@ -141,6 +144,9 @@ The Nsight timeline alone does not prove that any individual transfer is specifi
 ```text
 gpu-programming/
 ├── README.md
+│
+├── agentic-inference-optimization/
+│   └── README.md             ← Phase 1 exploration; implementation not started
 │
 ├── leetgpu/
 │   ├── README.md
@@ -181,6 +187,7 @@ The repository has multiple README files with separate responsibilities.
 | README                                                                           | Purpose                                                                |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | [`README.md`](README.md)                                                         | High-level repository map and current progress                         |
+| [`agentic-inference-optimization/README.md`](agentic-inference-optimization/README.md) | Agentic Inference Optimization: current phase and what is not built yet |
 | [`leetgpu/README.md`](leetgpu/README.md)                                         | LeetGPU CLI setup, languages, CUDA lesson notes                        |
 | [`inference-systems-notebooks/README.md`](inference-systems-notebooks/README.md) | Notebook topics, design notes, and status                              |
 | [`llm-inference-runtime-lab/README.md`](llm-inference-runtime-lab/README.md)     | Runtime methodology, benchmark results, profiling, and reproducibility |
