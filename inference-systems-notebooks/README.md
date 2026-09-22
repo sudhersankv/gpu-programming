@@ -99,8 +99,8 @@ Every notebook in this track should:
 
 | File | Status |
 |------|--------|
-| `01_prefill_decode_and_kv_cache.ipynb` | planned |
-| `02_kv_cache_memory_scaling.ipynb` | planned |
+| `01_prefill_decode_and_kv_cache.ipynb` | available |
+| `02_kv_cache_memory_scaling.ipynb` | available |
 | `03_paged_kv_memory.ipynb` | planned |
 | `04_automatic_prefix_caching.ipynb` | planned |
 | `05_radix_attention.ipynb` | planned |

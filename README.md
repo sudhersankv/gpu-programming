@@ -65,8 +65,9 @@ The notebooks use toy implementations, calculations, simulations, and visualizat
 Available now:
 
 * [`01_prefill_decode_and_kv_cache.ipynb`](inference-systems-notebooks/01_prefill_decode_and_kv_cache.ipynb)
+* [`02_kv_cache_memory_scaling.ipynb`](inference-systems-notebooks/02_kv_cache_memory_scaling.ipynb)
 
-Planned topics include KV-cache memory scaling, paged KV allocation, automatic prefix caching, RadixAttention, scheduling, FlashAttention, chunked prefill, speculative decoding, parallelism, quantization, and MoE inference.
+Planned topics include paged KV allocation, automatic prefix caching, RadixAttention, scheduling, FlashAttention, chunked prefill, speculative decoding, parallelism, quantization, and MoE inference.
 
 The complete topic list and notebook-specific notes live in the [notebook README](inference-systems-notebooks/README.md).
 
@@ -114,7 +115,7 @@ The Nsight timeline alone does not prove that any individual transfer is specifi
 | ------------------------------ | ---------------------------------------------------------------------- |
 | Agentic Inference Optimization | Phase 1 — exploration; project folder created, nothing implemented yet |
 | LeetGPU kernels                | CUDA lessons 01–04 complete; 05 in progress; other languages scaffolded |
-| Inference systems notebooks    | Notebook 01 available; remaining notebooks added as I study each topic |
+| Inference systems notebooks    | Notebooks 01–02 available; remaining notebooks added as I study each topic |
 | Inference runtime lab          | Phases 1–7 complete                                                    |
 | SGLang comparison           | Planned next runtime phase                                             |
 | TensorRT-LLM experiments    | Planned                                                                |
